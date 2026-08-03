@@ -1,0 +1,128 @@
+{
+  "name": "AI Voice & Text Note to Google Sheets Parser",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "name": "Telegram Voice/Text Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "model": "gemini-2.0-flash",
+        "options": {}
+      },
+      "name": "Google Gemini AI Engine",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [460, 520]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Foydalanuvchi quyidagi ovozli yoki matnli xabarni yubordi: '{{ $json.message.text || $json.message.caption || \"Ovozli xabar\" }}'\n\nUshbu matnni tahlil qilib, quyidagi JSON strukturasiga ajrating:\n{\n  \"sana\": \"YYYY-MM-DD (bugungi sana)\",\n  \"vaqt\": \"HH:MM\",\n  \"turi\": \"Tushum\" yoki \"Xarajat\" yoki \"Nasiya\",\n  \"shaxs\": \"Mijoz yoki kompaniya ismi\",\n  \"tushum_som\": 0,\n  \"xarajat_som\": 0,\n  \"nasiya_som\": 0,\n  \"kategoriya\": \"Savdo/Transport/Oziq-ovqat/Kommunal/Boshqa\",\n  \"izoh\": \"Qisqa tushunarli izoh\"\n}",
+        "hasOutputParser": true
+      },
+      "name": "AI Structured Note Parser",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "Sheet1"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Sana": "={{ $json.sana }}",
+            "Vaqt": "={{ $json.vaqt }}",
+            "Turi": "={{ $json.turi }}",
+            "Shaxs / Mijoz": "={{ $json.shaxs }}",
+            "Tushum (so'm)": "={{ $json.tushum_som }}",
+            "Xarajat (so'm)": "={{ $json.xarajat_som }}",
+            "Nasiya (so'm)": "={{ $json.nasiya_som }}",
+            "Kategoriya": "={{ $json.kategoriya }}",
+            "Izoh / Tafsilotlar": "={{ $json.izoh }}"
+          }
+        }
+      },
+      "name": "Google Sheets Append Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $node['Telegram Voice/Text Trigger'].json.message.chat.id }}",
+        "text": "=✅ Google Sheets jadvalingizga saqlandi!\n\n📅 Sana: {{ $json.sana }} ({{ $json.vaqt }})\n📌 Turi: {{ $json.turi }}\n👤 Mijoz/Shaxs: {{ $json.shaxs }}\n💰 Tushum: {{ $json.tushum_som }} so'm\n💸 Xarajat: {{ $json.xarajat_som }} so'm\n⏳ Nasiya: {{ $json.nasiya_som }} so'm\n🏷 Kategoriya: {{ $json.kategoriya }}\n📝 Izoh: {{ $json.izoh }}",
+        "additionalFields": {}
+      },
+      "name": "Telegram Tasdiq Xabari",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [960, 300]
+    }
+  ],
+  "connections": {
+    "Telegram Voice/Text Trigger": {
+      "main": [
+        [
+          {
+            "node": "AI Structured Note Parser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini AI Engine": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Structured Note Parser",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Structured Note Parser": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets Append Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets Append Row": {
+      "main": [
+        [
+          {
+            "node": "Telegram Tasdiq Xabari",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

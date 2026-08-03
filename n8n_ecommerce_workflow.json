@@ -1,0 +1,41 @@
+{
+  "name": "E-commerce Telegram Bot & Order Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "yangi-buyurtma",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "name": "Yangi Buyurtma Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "=@botfather",
+        "text": "=📦 YANGI BUYURTMA KELDI!\n\n🆔 Buyurtma №: {{ $json.body.order_id }}\n👤 Mijoz: {{ $json.body.customer_name }}\n📞 Telefon: {{ $json.body.phone }}\n🛍 Mahsulot: {{ $json.body.product_name }}\n💰 Summa: {{ $json.body.total_price }} so'm\n📍 Manzil: {{ $json.body.address }}",
+        "additionalFields": {}
+      },
+      "name": "Telegram Bildirishnoma",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [500, 300]
+    }
+  ],
+  "connections": {
+    "Yangi Buyurtma Webhook": {
+      "main": [
+        [
+          {
+            "node": "Telegram Bildirishnoma",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
