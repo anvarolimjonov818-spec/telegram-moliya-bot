@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ============================================================
 #  AI Voice & Text to Professional Excel (.xlsx) Bot
-#  - Ultra-Aniqlikdagi O'zbek Nutqi va Shovqinsiz Toza Matn (Whisper + Gemini/Groq)
+#  - Ultra-Aniqlikdagi O'zbek Nutqi va Murakkab Sonlar (480.000 / To'rt yuz sakson ming)
 #  - STT Shovqinlarini (Noise Words) Avtomatik Tozalash
 #  - Avtomatik OYMA-OY alohida varaqlar (Worksheets)
 #  - HAR BIR OY SAHIFASIDA FAQAT SHU OYNING KATEGORIYA HISOBOTI (K,L,M,N ustunlarda)
@@ -76,7 +76,7 @@ MONTH_NAMES_UZ = {
 }
 
 def clean_stt_noise(text: str) -> str:
-    """Whisper tushunarsiz shovqin so'zlarini (masalan: 'get over zikim') matndan tozalash"""
+    """Whisper tushunarsiz shovqin so'zlarini matndan tozalash"""
     if not text:
         return text
     noise_patterns = [
@@ -90,22 +90,17 @@ def clean_stt_noise(text: str) -> str:
     return cleaned
 
 def fix_uzbek_speech_phonetics(text: str) -> str:
-    """Whisper STT tomonidan xato o'g'rilgan o'zbekcha talaffuz va sonlarni avtomatik to'g'rilash"""
+    """Whisper STT tomonidan xato o'girilgan o'zbekcha talaffuz variantlarini to'g'rilash"""
     if not text:
         return text
 
     replacements = [
-        (r'\bsakismi\b|\bsaksen\b|\bsakson\b', '80000 so\'m'),
-        (r'\byettism\b|\byettmish\b|\byetmish\b', '70000 so\'m'),
-        (r'\boltmis\b|\boltmish\b', '60000 so\'m'),
-        (r'\bellik\b|\bellikming\b', '50000 so\'m'),
-        (r'\bqirq\b|\bqirqming\b', '40000 so\'m'),
-        (r'\bo\'ttis\b|\bottiz\b|\bo\'ttiz\b', '30000 so\'m'),
-        (r'\bigirma\b|\byigirma\b', '20000 so\'m'),
-        (r'\bonbesh\b|\bo\'nbesh\b', '15000 so\'m'),
-        (r'\bo\'n ming\b|\bon ming\b|\bonming\b', '10000 so\'m'),
-        (r'\byuz\b|\byuzming\b', '100000 so\'m'),
-        (r'\bbir million\b|\b1 mln\b', '1000000 so\'m'),
+        (r'\bsakismi\b|\bsaksen\b', 'sakson'),
+        (r'\byettism\b', 'yetmish'),
+        (r'\boltmis\b', 'oltmish'),
+        (r'\bo\'ttis\b', 'o\'ttiz'),
+        (r'\bigirma\b', 'yigirma'),
+        (r'\bonbesh\b', 'o\'n besh'),
         (r'\bso\'na\b|\bso\'n\b|\bsom\b', 'so\'m'),
         (r'\bturao\b|\bto\'rao\b|\bo\'kildim\b', 'to\'lov qildim'),
         (r'\bprogramma\b|\bgetu\b|\brizugim\b', 'dastur uchun')
@@ -412,28 +407,26 @@ GROQ_WHISPER_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 SYSTEM_PROMPT = """Siz O'zbek tili nutqi, iboralari va shevalari bo'yicha mutaxassis AI yordamchisiz.
 Foydalanuvchi ovozli yoki matnli xabarda nima degan bo'lsa (lotin yoki kirill alifbosida), uni quyidagi JSON formatiga o'giring.
 
-O'ZBEKCHA OVOZLI XABARLARNI 100% ANIQLIKDA TUZATISH QOIDALARI:
-1. O'ZBEKCHA SONLAR VA PHONETIK VARIANTLAR (Har doim to'g'ri son va summaga o'giring!):
-   - "sakismi" / "saksen" / "saksonming" / "sakson ming" / "80 ming" / "80k" = 80000 so'm
-   - "yettism" / "yetmishming" / "yetmish ming" = 70000 so'm
-   - "oltmis" / "oltmishming" / "oltmish ming" = 60000 so'm
-   - "ellik" / "ellikming" / "ellik ming" = 50000 so'm
-   - "qirq" / "qirqming" / "qirq ming" = 40000 so'm
-   - "o'ttis" / "ottizming" / "o'ttiz ming" = 30000 so'm
-   - "yigirmabeshming" / "25 ming" = 25000 so'm
-   - "igirma" / "yigirmaming" / "yigirma ming" = 20000 so'm
-   - "o'nbesh" / "15 ming" = 15000 so'm
-   - "o'nming" / "o'n ming" = 10000 so'm
-   - "yuzming" / "yuz ming" = 100000 so'm
+O'ZBEKCHA OVOZLI XABARLARNI VA MURAKKAB SONLARNI 100% ANIQLIKDA TUZATISH QOIDALARI:
+1. O'ZBEKCHA MURAKKAB SONLAR VA YUZLIKLAR (To'liq hisoblang!):
+   - "to'rt yuz sakson ming" / "480.000" / "480 ming" / "480k" = 480000 so'm (480 so'm emas, 80 ming emas, to'liq 480000 so'm!).
+   - "uch yuz ellik ming" / "350 ming" = 350000 so'm
+   - "ikki yuz ming" / "200 ming" = 200000 so'm
+   - "bir yuz ellik ming" / "150 ming" = 150000 so'm
+   - "besh yuz ming" / "500 ming" = 500000 so'm
+   - "sakson ming" / "80 ming" = 80000 so'm
+   - "ellik ming" / "50 ming" = 50000 so'm
+   - "yigirma ming" / "20 ming" = 20000 so'm
+   - "o'n ming" / "10 ming" = 10000 so'm
    - "bir million" / "1 mln" = 1000000 so'm
 
 2. STT SHOVQIN SO'ZLARINI TOZALASH:
    - "get over zikim", "subtitles", "amara" kabi shovqin so'zlarni batamom o'chirib tashlang.
-   - "toza_matn" maydonida FAQAT toza o'zbekcha chiroyli jumlani qaytaring (Masalan: "Dastur uchun 80 000 so'm to'lov qildim").
+   - "toza_matn" maydonida FAQAT toza o'zbekcha chiroyli jumlani qaytaring (Masalan: "Dastur uchun 480 000 so'm to'lov qildim").
 
 3. TURI VA KATEGORIYANI ANIQLASH:
    - Agar "qildim", "berdim", "sotib oldim", "to'ladim" bo'lsa -> "Xarajat"
-   - Agar "oldim", "tushdi", "sotdim", "berdi" bo me'yorida bo'lsa -> "Tushum"
+   - Agar "oldim", "tushdi", "sotdim", "berdi" bo'lsa -> "Tushum"
    - Agar "nasiya", "qarz" bo'lsa -> "Nasiya"
 
 Javobingiz FAQAT va FAQAT toza JSON bo'lishi shart (hech qanday markdown prefiksiz, ```json siz):
@@ -456,7 +449,7 @@ async def transcribe_audio_with_groq(audio_bytes: bytes) -> str:
     form.add_field('model', 'whisper-large-v3-turbo')
     form.add_field('language', 'uz')
     form.add_field('temperature', '0.0')
-    form.add_field('prompt', "O'zbek tilidagi moliya va xarajatlar: sakson ming so'm, sakismi to'lov qildim, benzinga yigirma ming so'm to'lov qildim, gazga 25 ming, taksiga 15 ming, bozorlikka 100 ming. Toshkent, Farg'ona, Samarqand shevalarida: sakson ming so'm, yigirma ming so'm, ellik ming so'm, yuz ming so'm.")
+    form.add_field('prompt', "O'zbek tilidagi moliya va xarajatlar: to'rt yuz sakson ming so'm to'lov qildim, 480 ming so'm, uch yuz ellik ming, sakson ming so'm, benzinga yigirma ming, gazga 25 ming.")
 
     async with aiohttp.ClientSession() as session:
         async with session.post(GROQ_WHISPER_URL, data=form, headers=headers, timeout=aiohttp.ClientTimeout(total=45)) as resp:
@@ -734,10 +727,10 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "👋 Assalomu alaykum!\n\n"
         "Men sizning **Professional Excel / Google Sheets AI Yordamchingizman**.\n\n"
         "🎙 Menga **ovozli xabar (golosovoy)** yuboring yoki matn ko'rinishida yozing:\n"
-        "👉 *\"Benzinga yigirma ming to'lov qildim\"*\n"
+        "👉 *\"Dastur uchun to'rt yuz sakson ming so'm to'lov qildim\"*\n"
         "👉 *\"Bugun Shoxruxga 150000 so'mga atir sotdim\"*\n\n"
-        "🎙 **ULTRA-ANIQ OVOZ TAHLILI (Shovqinsiz Toza Matn):**\n"
-        "Bot O'zbek tili va shevalaridagi barcha ovozli xabarlarni ultra-yuqori aniqlikda tushunadi va to'g'ri summalarga o'girib saqlaydi! 📁✨\n\n"
+        "🎙 **ULTRA-ANIQ OVOZ VA MURAKKAB SONLAR TAHLILI:**\n"
+        "Bot O'zbek tili va murakkab sonlarni (masalan: *480 000 so'm / to'rt yuz sakson ming*) ultra-yuqori aniqlikda tushunadi va to'g'ri summalarga o'girib saqlaydi! 📁✨\n\n"
         "📈 **Oylik Hisobot:** Pastdagi '📈 Kategoriyalar Hisoboti' tugmasini bossangiz, shu oyning tushum va xarajatlarini ko'rasiz."
     )
     await update.message.reply_text(welcome, parse_mode="Markdown", reply_markup=get_reply_menu())
@@ -927,7 +920,7 @@ def main():
     except Exception as h_err:
         logger.warning(f"Health server error: {h_err}")
 
-    logger.info("🤖 Voice & Text to Styled Excel (.xlsx) Bot with Clean Uzbek Text Sanitizer & 24/7 Health Server...")
+    logger.info("🤖 Voice & Text to Styled Excel (.xlsx) Bot with Uzbek Compound Number Support (480.000 so'm)...")
     app = (
         Application.builder()
         .token(BOT_TOKEN)
