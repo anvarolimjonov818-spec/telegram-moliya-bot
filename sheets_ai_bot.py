@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # ============================================================
-#  AI Voice & Text Note to Professional Excel (.xlsx) Bot
-#  - Ovozli va Matnli xabarlarni tahlil qilish
-#  - Gemini + Groq (Llama 3.3 70B) bilan strukturaga ajratish
-#  - Avtomatik OYMA-OY alohida varaqlar (Worksheets) yaratish (2026-08 (Avgust)...)
-#  - Kategoriyalar bo'yicha Oylik JAMI Hisobotlar
+#  AI Voice & Text to Professional Excel (.xlsx) Bot
+#  - Ultra-Aniqlikdagi O'zbek Nutqi va Shovqinsiz Toza Matn (Whisper + Gemini/Groq)
+#  - STT Shovqinlarini (Noise Words) Avtomatik Tozalash
+#  - Avtomatik OYMA-OY alohida varaqlar (Worksheets)
+#  - HAR BIR OY SAHIFASIDA FAQAT SHU OYNING KATEGORIYA HISOBOTI (K,L,M,N ustunlarda)
 #  - Istalgan qatorni ko'rish va o'chirish
 # ============================================================
 
@@ -61,7 +61,12 @@ COLUMN_WIDTHS = {
     "F": 18,  # Xarajat
     "G": 18,  # Nasiya
     "H": 18,  # Kategoriya
-    "I": 50   # Izoh / Tafsilotlar
+    "I": 50,  # Izoh / Tafsilotlar
+    "J": 5,   # Ajratuvchi bo'sh ustun
+    "K": 22,  # Kategoriya Hisoboti (Kategoriya)
+    "L": 18,  # Tushum
+    "M": 18,  # Xarajat
+    "N": 18   # Nasiya
 }
 
 MONTH_NAMES_UZ = {
@@ -70,8 +75,48 @@ MONTH_NAMES_UZ = {
     "09": "Sentabr", "10": "Oktabr", "11": "Noyabr", "12": "Dekabr"
 }
 
+def clean_stt_noise(text: str) -> str:
+    """Whisper tushunarsiz shovqin so'zlarini (masalan: 'get over zikim') matndan tozalash"""
+    if not text:
+        return text
+    noise_patterns = [
+        r'\bget\b', r'\bover\b', r'\bzikim\b', r'\buh\b', r'\bumm\b',
+        r'\bsubtitles\b', r'\bby amara\.org\b', r'\bthank you\b', r'\bthanks\b'
+    ]
+    cleaned = text
+    for np in noise_patterns:
+        cleaned = re.sub(np, '', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+    return cleaned
+
+def fix_uzbek_speech_phonetics(text: str) -> str:
+    """Whisper STT tomonidan xato o'g'rilgan o'zbekcha talaffuz va sonlarni avtomatik to'g'rilash"""
+    if not text:
+        return text
+
+    replacements = [
+        (r'\bsakismi\b|\bsaksen\b|\bsakson\b', '80000 so\'m'),
+        (r'\byettism\b|\byettmish\b|\byetmish\b', '70000 so\'m'),
+        (r'\boltmis\b|\boltmish\b', '60000 so\'m'),
+        (r'\bellik\b|\bellikming\b', '50000 so\'m'),
+        (r'\bqirq\b|\bqirqming\b', '40000 so\'m'),
+        (r'\bo\'ttis\b|\bottiz\b|\bo\'ttiz\b', '30000 so\'m'),
+        (r'\bigirma\b|\byigirma\b', '20000 so\'m'),
+        (r'\bonbesh\b|\bo\'nbesh\b', '15000 so\'m'),
+        (r'\bo\'n ming\b|\bon ming\b|\bonming\b', '10000 so\'m'),
+        (r'\byuz\b|\byuzming\b', '100000 so\'m'),
+        (r'\bbir million\b|\b1 mln\b', '1000000 so\'m'),
+        (r'\bso\'na\b|\bso\'n\b|\bsom\b', 'so\'m'),
+        (r'\bturao\b|\bto\'rao\b|\bo\'kildim\b', 'to\'lov qildim'),
+        (r'\bprogramma\b|\bgetu\b|\brizugim\b', 'dastur uchun')
+    ]
+
+    fixed = text
+    for pattern, repl in replacements:
+        fixed = re.sub(pattern, repl, fixed, flags=re.IGNORECASE)
+    return clean_stt_noise(fixed)
+
 def get_month_sheet_title(date_str: str) -> str:
-    """Sana berilganda (masalan: 2026-08-01) oylik varaq nomini qaytaradi: '2026-08 (Avgust)'"""
     try:
         parts = date_str.split("-")
         year = parts[0]
@@ -139,6 +184,137 @@ def get_all_rows():
                     })
     return rows
 
+def render_in_sheet_summary(ws):
+    font_header = Font(name="Arial", size=11, bold=True, color="FFFFFF")
+    fill_header = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+    font_bold = Font(name="Arial", size=10, bold=True)
+    font_normal = Font(name="Arial", size=10)
+    thin_border = Border(left=Side(style='thin', color='D9D9D9'), right=Side(style='thin', color='D9D9D9'), top=Side(style='thin', color='D9D9D9'), bottom=Side(style='thin', color='D9D9D9'))
+
+    max_r = max(ws.max_row + 5, 25)
+    for r in range(1, max_r):
+        for c in range(11, 15):
+            cell = ws.cell(row=r, column=c)
+            cell.value = None
+            cell.fill = PatternFill(fill_type=None)
+            cell.border = Border()
+
+    sum_headers = ["Kategoriya (Hisobot)", "Tushum (so'm)", "Xarajat (so'm)", "Nasiya (so'm)"]
+    for idx, h_text in enumerate(sum_headers, 11):
+        cell = ws.cell(row=1, column=idx, value=h_text)
+        cell.font = font_header
+        cell.fill = fill_header
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        cell.border = thin_border
+
+    tushum_by_cat = {}
+    xarajat_by_cat = {}
+    nasiya_by_cat = {}
+    total_tushum = 0
+    total_xarajat = 0
+    total_nasiya = 0
+
+    for r_i in range(2, ws.max_row + 1):
+        sana_val = ws.cell(row=r_i, column=1).value
+        if not sana_val or str(sana_val).startswith("Sana"):
+            continue
+
+        t_c = ws.cell(row=r_i, column=5).value
+        x_c = ws.cell(row=r_i, column=6).value
+        n_c = ws.cell(row=r_i, column=7).value
+        cat_c = ws.cell(row=r_i, column=8).value
+
+        try:
+            t_val = int(t_c) if t_c is not None and str(t_c).isdigit() else 0
+        except:
+            t_val = 0
+        try:
+            x_val = int(x_c) if x_c is not None and str(x_c).isdigit() else 0
+        except:
+            x_val = 0
+        try:
+            n_val = int(n_c) if n_c is not None and str(n_c).isdigit() else 0
+        except:
+            n_val = 0
+
+        cat = str(cat_c).strip() if cat_c else "Boshqa"
+        if not cat:
+            cat = "Boshqa"
+
+        if t_val > 0:
+            tushum_by_cat[cat] = tushum_by_cat.get(cat, 0) + t_val
+            total_tushum += t_val
+        if x_val > 0:
+            xarajat_by_cat[cat] = xarajat_by_cat.get(cat, 0) + x_val
+            total_xarajat += x_val
+        if n_val > 0:
+            nasiya_by_cat[cat] = nasiya_by_cat.get(cat, 0) + n_val
+            total_nasiya += n_val
+
+    all_cats = sorted(list(set(list(tushum_by_cat.keys()) + list(xarajat_by_cat.keys()) + list(nasiya_by_cat.keys()))))
+
+    current_row = 2
+    for cat in all_cats:
+        t_val = tushum_by_cat.get(cat, 0)
+        x_val = xarajat_by_cat.get(cat, 0)
+        n_val = nasiya_by_cat.get(cat, 0)
+
+        fill_r = PatternFill(start_color="F9FBFD" if current_row % 2 == 0 else "FFFFFF", fill_type="solid")
+
+        c1 = ws.cell(row=current_row, column=11, value=cat)
+        c1.font = font_normal
+        c1.fill = fill_r
+        c1.border = thin_border
+        c1.alignment = Alignment(horizontal="left", vertical="center")
+
+        for c_idx, val in enumerate([t_val, x_val, n_val], 12):
+            cell = ws.cell(row=current_row, column=c_idx, value=val)
+            cell.font = font_normal
+            cell.fill = fill_r
+            cell.border = thin_border
+            cell.alignment = Alignment(horizontal="right", vertical="center")
+            cell.number_format = '#,##0'
+
+        ws.row_dimensions[current_row].height = 20
+        current_row += 1
+
+    fill_tot = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+    tot_vals = ["JAMI TOTAL", total_tushum, total_xarajat, total_nasiya]
+    for idx, val in enumerate(tot_vals, 11):
+        cell = ws.cell(row=current_row, column=idx, value=val)
+        cell.font = font_bold
+        cell.fill = fill_tot
+        cell.border = thin_border
+        if idx > 11:
+            cell.alignment = Alignment(horizontal="right", vertical="center")
+            cell.number_format = '#,##0'
+        else:
+            cell.alignment = Alignment(horizontal="left", vertical="center")
+
+    ws.row_dimensions[current_row].height = 24
+    current_row += 1
+
+    sof_foyda = total_tushum - total_xarajat
+    fill_profit = PatternFill(start_color="E2EFDA" if sof_foyda >= 0 else "FCE4D6", fill_type="solid")
+    c_p1 = ws.cell(row=current_row, column=11, value="SOF FOYDA")
+    c_p1.font = font_bold
+    c_p1.fill = fill_profit
+    c_p1.border = thin_border
+
+    c_p2 = ws.cell(row=current_row, column=12, value=sof_foyda)
+    c_p2.font = font_bold
+    c_p2.fill = fill_profit
+    c_p2.border = thin_border
+    c_p2.alignment = Alignment(horizontal="right", vertical="center")
+    c_p2.number_format = '#,##0'
+
+    for c_i in range(13, 15):
+        c_empty = ws.cell(row=current_row, column=c_i, value="")
+        c_empty.fill = fill_profit
+        c_empty.border = thin_border
+
+    ws.row_dimensions[current_row].height = 24
+
 def delete_specific_row(data_row_id: int):
     deleted_info = None
 
@@ -167,17 +343,13 @@ def delete_specific_row(data_row_id: int):
 
     if os.path.exists(EXCEL_FILE_PATH):
         wb = openpyxl.load_workbook(EXCEL_FILE_PATH)
-
-        # Barcha varaqlardan ushbu qatorni izlab o'chirish
         for sheet_name in wb.sheetnames:
-            if sheet_name == "Kategoriya Hisoboti":
-                continue
             ws = wb[sheet_name]
             excel_row = data_row_id + 1
             if 2 <= excel_row <= ws.max_row:
                 ws.delete_rows(excel_row)
+            render_in_sheet_summary(ws)
 
-        update_excel_summary_sheet(wb)
         wb.save(EXCEL_FILE_PATH)
 
     return deleted_info
@@ -189,7 +361,6 @@ def delete_last_entry():
     return None
 
 def get_category_totals(target_month_prefix: str = None):
-    """Kategoriyalar bo'yicha hisobot (agar target_month_prefix masalan '2026-08' berilsa, faqat o'sha oy uchun)"""
     tushum_by_cat = {}
     xarajat_by_cat = {}
     nasiya_by_cat = {}
@@ -234,87 +405,36 @@ def get_category_totals(target_month_prefix: str = None):
         "sof_foyda": total_tushum - total_xarajat
     }
 
-def update_excel_summary_sheet(wb):
-    if "Kategoriya Hisoboti" in wb.sheetnames:
-        del wb["Kategoriya Hisoboti"]
-
-    ws_sum = wb.create_sheet("Kategoriya Hisoboti")
-    stats = get_category_totals()
-
-    font_title = Font(name="Arial", size=12, bold=True, color="FFFFFF")
-    fill_header = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
-    font_bold = Font(name="Arial", size=10, bold=True)
-    font_normal = Font(name="Arial", size=10)
-    thin_border = Border(left=Side(style='thin', color='D9D9D9'), right=Side(style='thin', color='D9D9D9'), top=Side(style='thin', color='D9D9D9'), bottom=Side(style='thin', color='D9D9D9'))
-
-    ws_sum.append(["Kategoriya", "Tushum (so'm)", "Xarajat (so'm)", "Nasiya (so'm)"])
-    for col_i in range(1, 5):
-        cell = ws_sum.cell(row=1, column=col_i)
-        cell.font = font_title
-        cell.fill = fill_header
-        cell.alignment = Alignment(horizontal="center", vertical="center")
-
-    ws_sum.column_dimensions["A"].width = 25
-    ws_sum.column_dimensions["B"].width = 20
-    ws_sum.column_dimensions["C"].width = 20
-    ws_sum.column_dimensions["D"].width = 20
-    ws_sum.row_dimensions[1].height = 26
-
-    all_cats = sorted(list(set(list(stats["tushum_by_cat"].keys()) + list(stats["xarajat_by_cat"].keys()) + list(stats["nasiya_by_cat"].keys()))))
-
-    for cat in all_cats:
-        t_val = stats["tushum_by_cat"].get(cat, 0)
-        x_val = stats["xarajat_by_cat"].get(cat, 0)
-        n_val = stats["nasiya_by_cat"].get(cat, 0)
-        ws_sum.append([cat, t_val, x_val, n_val])
-        row_i = ws_sum.max_row
-        ws_sum.row_dimensions[row_i].height = 20
-        ws_sum.cell(row=row_i, column=1).font = font_normal
-        ws_sum.cell(row=row_i, column=1).border = thin_border
-        for c_idx, val in enumerate([t_val, x_val, n_val], 2):
-            cell = ws_sum.cell(row=row_i, column=c_idx)
-            cell.font = font_normal
-            cell.number_format = '#,##0'
-            cell.border = thin_border
-
-    ws_sum.append(["JAMI TOTAL", stats["total_tushum"], stats["total_xarajat"], stats["total_nasiya"]])
-    tot_row = ws_sum.max_row
-    ws_sum.row_dimensions[tot_row].height = 24
-    fill_tot = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
-    for col_i in range(1, 5):
-        cell = ws_sum.cell(row=tot_row, column=col_i)
-        cell.font = font_bold
-        cell.fill = fill_tot
-        cell.border = thin_border
-        if col_i > 1:
-            cell.number_format = '#,##0'
-
-    ws_sum.append([])
-    ws_sum.append(["SOF FOYDA (Tushum - Xarajat)", stats["sof_foyda"], "", ""])
-    profit_row = ws_sum.max_row
-    fill_profit = PatternFill(start_color="E2EFDA" if stats["sof_foyda"] >= 0 else "FCE4D6", fill_type="solid")
-    ws_sum.cell(row=profit_row, column=1).font = font_bold
-    ws_sum.cell(row=profit_row, column=2).font = font_bold
-    ws_sum.cell(row=profit_row, column=2).number_format = '#,##0'
-    ws_sum.cell(row=profit_row, column=1).fill = fill_profit
-    ws_sum.cell(row=profit_row, column=2).fill = fill_profit
-
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_WHISPER_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 
-SYSTEM_PROMPT = """Siz moliya va eslatmalarni strukturaga ajratuvchi mutaxassis AI yordamchisiz.
+SYSTEM_PROMPT = """Siz O'zbek tili nutqi, iboralari va shevalari bo'yicha mutaxassis AI yordamchisiz.
 Foydalanuvchi ovozli yoki matnli xabarda nima degan bo'lsa (lotin yoki kirill alifbosida), uni quyidagi JSON formatiga o'giring.
 
-MUHIM MOLLYA VA SUMMA QOIDALARI:
-1. O'zbekcha aytilgan summalarni to'g'ri raqamga o'giring:
-   - "yigirma ming" / "игирма мин" / "20 ming" / "20k" = 20000
-   - "o'n ming" / "10 ming" = 10000
-   - "ellik ming" / "50 ming" = 50000
-   - "yuz ming" / "100 ming" = 100000
-   - "bir million" / "1 mln" = 1000000
-   - "yigirma ming so'm" -> 20000 so'm (20 so'm emas!).
-2. Kirillcha va xato yozilgan so'zlarni to'g'irlang (masalan: "бензенгай" -> Benzin / Transport, "игирма мин" -> 20000 so'm).
+O'ZBEKCHA OVOZLI XABARLARNI 100% ANIQLIKDA TUZATISH QOIDALARI:
+1. O'ZBEKCHA SONLAR VA PHONETIK VARIANTLAR (Har doim to'g'ri son va summaga o'giring!):
+   - "sakismi" / "saksen" / "saksonming" / "sakson ming" / "80 ming" / "80k" = 80000 so'm
+   - "yettism" / "yetmishming" / "yetmish ming" = 70000 so'm
+   - "oltmis" / "oltmishming" / "oltmish ming" = 60000 so'm
+   - "ellik" / "ellikming" / "ellik ming" = 50000 so'm
+   - "qirq" / "qirqming" / "qirq ming" = 40000 so'm
+   - "o'ttis" / "ottizming" / "o'ttiz ming" = 30000 so'm
+   - "yigirmabeshming" / "25 ming" = 25000 so'm
+   - "igirma" / "yigirmaming" / "yigirma ming" = 20000 so'm
+   - "o'nbesh" / "15 ming" = 15000 so'm
+   - "o'nming" / "o'n ming" = 10000 so'm
+   - "yuzming" / "yuz ming" = 100000 so'm
+   - "bir million" / "1 mln" = 1000000 so'm
+
+2. STT SHOVQIN SO'ZLARINI TOZALASH:
+   - "get over zikim", "subtitles", "amara" kabi shovqin so'zlarni batamom o'chirib tashlang.
+   - "toza_matn" maydonida FAQAT toza o'zbekcha chiroyli jumlani qaytaring (Masalan: "Dastur uchun 80 000 so'm to'lov qildim").
+
+3. TURI VA KATEGORIYANI ANIQLASH:
+   - Agar "qildim", "berdim", "sotib oldim", "to'ladim" bo'lsa -> "Xarajat"
+   - Agar "oldim", "tushdi", "sotdim", "berdi" bo me'yorida bo'lsa -> "Tushum"
+   - Agar "nasiya", "qarz" bo'lsa -> "Nasiya"
 
 Javobingiz FAQAT va FAQAT toza JSON bo'lishi shart (hech qanday markdown prefiksiz, ```json siz):
 
@@ -325,7 +445,8 @@ Javobingiz FAQAT va FAQAT toza JSON bo'lishi shart (hech qanday markdown prefiks
   "xarajat_som": 0,
   "nasiya_som": 0,
   "kategoriya": "Savdo/Transport/Oziq-ovqat/Kommunal/Boshqa",
-  "izoh": "Tafsilotli qisqa izoh"
+  "izoh": "Tafsilotli qisqa izoh",
+  "toza_matn": "Shovqinsiz chiroyli toza o'zbekcha jumla"
 }"""
 
 async def transcribe_audio_with_groq(audio_bytes: bytes) -> str:
@@ -333,7 +454,9 @@ async def transcribe_audio_with_groq(audio_bytes: bytes) -> str:
     form = aiohttp.FormData()
     form.add_field('file', audio_bytes, filename='voice.ogg', content_type='audio/ogg')
     form.add_field('model', 'whisper-large-v3-turbo')
-    form.add_field('prompt', "O'zbek tilida moliya va xarajatlar: benzinga 20000 so'm, yigirma ming so'm, ellik ming so'm, yuz ming so'm, tushum, xarajat, nasiya.")
+    form.add_field('language', 'uz')
+    form.add_field('temperature', '0.0')
+    form.add_field('prompt', "O'zbek tilidagi moliya va xarajatlar: sakson ming so'm, sakismi to'lov qildim, benzinga yigirma ming so'm to'lov qildim, gazga 25 ming, taksiga 15 ming, bozorlikka 100 ming. Toshkent, Farg'ona, Samarqand shevalarida: sakson ming so'm, yigirma ming so'm, ellik ming so'm, yuz ming so'm.")
 
     async with aiohttp.ClientSession() as session:
         async with session.post(GROQ_WHISPER_URL, data=form, headers=headers, timeout=aiohttp.ClientTimeout(total=45)) as resp:
@@ -341,7 +464,8 @@ async def transcribe_audio_with_groq(audio_bytes: bytes) -> str:
                 err_text = await resp.text()
                 raise Exception(f"Whisper error ({resp.status}): {err_text[:150]}")
             result = await resp.json()
-            return result.get("text", "").strip()
+            text = result.get("text", "").strip()
+            return fix_uzbek_speech_phonetics(text)
 
 async def call_gemini_parser(prompt_text: str, audio_b64: str = None) -> str:
     parts = [{"text": prompt_text}]
@@ -389,7 +513,7 @@ async def parse_note_with_ai(text: str = "", audio_b64: str = None) -> dict:
     now = datetime.datetime.now()
     date_str = now.strftime("%Y-%m-%d")
     time_str = now.strftime("%H:%M")
-    prompt_text = f"Bugungi sana: {date_str} {time_str}.\nFoydalanuvchi xabari: '{text}'"
+    prompt_text = f"Bugungi sana: {date_str} {time_str}.\nFoydalanuvchi ovozli/matnli xabari: '{text}'"
 
     raw_json = None
     last_error = ""
@@ -424,7 +548,6 @@ async def parse_note_with_ai(text: str = "", audio_b64: str = None) -> dict:
     return parsed
 
 def append_row_to_worksheet(ws, row_data):
-    """Katakchaga chiroyli dizayn bilan qator qo'shish"""
     ws.append(row_data)
     last_row = ws.max_row
 
@@ -450,7 +573,6 @@ def append_row_to_worksheet(ws, row_data):
             cell.alignment = Alignment(horizontal="left", vertical="center")
 
 def append_to_excel_and_csv(data: dict):
-    # 1. CSV ga yozish
     with open(CSV_FILE_PATH, mode='a', newline='', encoding='utf-8-sig') as f:
         writer = csv.writer(f, delimiter=';')
         writer.writerow([
@@ -465,7 +587,6 @@ def append_to_excel_and_csv(data: dict):
             data.get("izoh", "")
         ])
 
-    # 2. Excel (.xlsx) ga Avtomatik Oylik Varaqlarga yozish
     if not os.path.exists(EXCEL_FILE_PATH):
         wb = create_styled_excel()
     else:
@@ -483,13 +604,13 @@ def append_to_excel_and_csv(data: dict):
         data.get("izoh", "")
     ]
 
-    # A) "Barcha Yozuvlar" varag'iga qo'shish
     ws_all = wb["Barcha Yozuvlar"] if "Barcha Yozuvlar" in wb.sheetnames else wb.active
     setup_sheet_header(ws_all)
     append_row_to_worksheet(ws_all, row_data)
+    render_in_sheet_summary(ws_all)
 
-    # B) Avtomatik tegishli Oy varag'iga (masalan: "2026-08 (Avgust)") qo'shish!
-    month_sheet_name = get_month_sheet_title(data.get("sana", ""))
+    date_val = data.get("sana", "")
+    month_sheet_name = get_month_sheet_title(date_val)
     if month_sheet_name not in wb.sheetnames:
         ws_month = wb.create_sheet(month_sheet_name)
         setup_sheet_header(ws_month)
@@ -497,9 +618,8 @@ def append_to_excel_and_csv(data: dict):
         ws_month = wb[month_sheet_name]
 
     append_row_to_worksheet(ws_month, row_data)
+    render_in_sheet_summary(ws_month)
 
-    # C) Kategoriya Hisoboti varag'ini yangilash
-    update_excel_summary_sheet(wb)
     wb.save(EXCEL_FILE_PATH)
 
 def get_action_keyboard():
@@ -616,8 +736,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🎙 Menga **ovozli xabar (golosovoy)** yuboring yoki matn ko'rinishida yozing:\n"
         "👉 *\"Benzinga yigirma ming to'lov qildim\"*\n"
         "👉 *\"Bugun Shoxruxga 150000 so'mga atir sotdim\"*\n\n"
-        "📅 **OYMA-OY AVTOMATIK SAQLASH:**\n"
-        "Siz yangi jadval ochishingiz shart emas! Bot har bir oyni avtomatik ravishda **Excel ichida alohida oylik varaqlar (2026-08 (Avgust), 2026-09 (Sentabr)...)** ko'rinishida guruhlab boradi! 📁✨\n\n"
+        "🎙 **ULTRA-ANIQ OVOZ TAHLILI (Shovqinsiz Toza Matn):**\n"
+        "Bot O'zbek tili va shevalaridagi barcha ovozli xabarlarni ultra-yuqori aniqlikda tushunadi va to'g'ri summalarga o'girib saqlaydi! 📁✨\n\n"
         "📈 **Oylik Hisobot:** Pastdagi '📈 Kategoriyalar Hisoboti' tugmasini bossangiz, shu oyning tushum va xarajatlarini ko'rasiz."
     )
     await update.message.reply_text(welcome, parse_mode="Markdown", reply_markup=get_reply_menu())
@@ -634,7 +754,7 @@ async def send_excel_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 chat_id=chat_id,
                 document=doc,
                 filename="Mening_Moliya_Jadvalim.xlsx",
-                caption="📊 **Sizning Moliya Excel Jadvalingiz**\n\n*(Excel ichida har bir oy uchun alohida varaqlar: '2026-08 (Avgust)', 'Barcha Yozuvlar' va 'Kategoriya Hisoboti' mavjud)*",
+                caption="📊 **Sizning Moliya Excel Jadvalingiz**\n\n*(Har bir oylik sahifada FAQAT shu oyning Kategoriya Hisoboti alohida ko'rsatilgan)*",
                 parse_mode="Markdown"
             )
     else:
@@ -722,9 +842,18 @@ async def handle_text_or_voice(update: Update, context: ContextTypes.DEFAULT_TYP
 
     try:
         if msg.voice or msg.audio:
-            file_obj = await (msg.voice or msg.audio).get_file()
-            audio_bytes = await file_obj.download_as_bytearray()
-            audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
+            audio_bytes = None
+            for attempt in range(3):
+                try:
+                    file_obj = await (msg.voice or msg.audio).get_file(read_timeout=60, write_timeout=60, connect_timeout=60)
+                    audio_bytes = await file_obj.download_as_bytearray(read_timeout=60, write_timeout=60, connect_timeout=60)
+                    audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
+                    break
+                except Exception as dl_err:
+                    logger.warning(f"Audio download attempt {attempt+1} failed: {dl_err}")
+                    if attempt == 2:
+                        raise dl_err
+                    await asyncio.sleep(1)
 
             try:
                 logger.info("🎙 Groq Whisper API ga ovozli fayl yuborilmoqda...")
@@ -743,9 +872,12 @@ async def handle_text_or_voice(update: Update, context: ContextTypes.DEFAULT_TYP
 
         month_label = get_month_sheet_title(res.get('sana', ''))
 
+        display_text = res.get("toza_matn") or clean_stt_noise(text_input)
+
         reply_text = (
-            f"✅ **Excel jadvalingizning '{month_label}' varag'iga saqlandi!** 📊\n\n"
-            f"🗣 **Eshitilgan xabar:** *\"{text_input}\"*\n\n"
+            f"✅ **Excel jadvalingizning '{month_label}' varag'iga saqlandi!** 📊\n"
+            f"*(Ushbu oyning Kategoriya Hisoboti o'ng tomonga alohida joylandi)*\n\n"
+            f"🗣 **Eshitilgan xabar:** *\"{display_text}\"*\n\n"
             f"📅 **Sana:** `{res.get('sana')}` ({res.get('vaqt')})\n"
             f"📌 **Turi:** {res.get('turi')}\n"
             f"👤 **Shaxs/Mijoz:** {res.get('shaxs')}\n"
@@ -769,8 +901,17 @@ async def handle_text_or_voice(update: Update, context: ContextTypes.DEFAULT_TYP
             await msg.reply_text(f"❌ Xato: {str(e)[:200]}")
 
 def main():
-    logger.info("🤖 Voice & Text to Styled Excel (.xlsx) Bot with Monthly Sheets support...")
-    app = Application.builder().token(BOT_TOKEN).build()
+    logger.info("🤖 Voice & Text to Styled Excel (.xlsx) Bot with Clean Uzbek Text Sanitizer...")
+    app = (
+        Application.builder()
+        .token(BOT_TOKEN)
+        .read_timeout(60)
+        .write_timeout(60)
+        .connect_timeout(60)
+        .pool_timeout(60)
+        .get_updates_read_timeout(60)
+        .build()
+    )
 
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("jadval", send_excel_file))
