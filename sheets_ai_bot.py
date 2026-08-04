@@ -53,20 +53,20 @@ HEADERS = [
 ]
 
 COLUMN_WIDTHS = {
-    "A": 15,  # Sana
-    "B": 10,  # Vaqt
-    "C": 14,  # Turi
-    "D": 22,  # Shaxs / Mijoz
-    "E": 18,  # Tushum
-    "F": 18,  # Xarajat
-    "G": 18,  # Nasiya
-    "H": 18,  # Kategoriya
-    "I": 50,  # Izoh / Tafsilotlar
-    "J": 5,   # Ajratuvchi bo'sh ustun
-    "K": 22,  # Kategoriya Hisoboti (Kategoriya)
-    "L": 18,  # Tushum
-    "M": 18,  # Xarajat
-    "N": 18   # Nasiya
+    "A": 14,  # Sana
+    "B": 9,   # Vaqt
+    "C": 13,  # Turi
+    "D": 18,  # Shaxs / Mijoz
+    "E": 16,  # Tushum
+    "F": 16,  # Xarajat
+    "G": 16,  # Nasiya
+    "H": 16,  # Kategoriya
+    "I": 32,  # Izoh / Tafsilotlar
+    "J": 3,   # Ajratuvchi bo'sh ustun
+    "K": 20,  # Kategoriya Hisoboti
+    "L": 15,  # Tushum
+    "M": 15,  # Xarajat
+    "N": 15   # Nasiya
 }
 
 MONTH_NAMES_UZ = {
@@ -122,6 +122,7 @@ def get_month_sheet_title(date_str: str) -> str:
         return "Barcha Yozuvlar"
 
 def setup_sheet_header(ws):
+    ws.sheet_view.zoomScale = 100
     header_font = Font(name="Arial", size=11, bold=True, color="FFFFFF")
     header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
     center_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
