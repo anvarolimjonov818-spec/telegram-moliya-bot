@@ -900,8 +900,34 @@ async def handle_text_or_voice(update: Update, context: ContextTypes.DEFAULT_TYP
         except:
             await msg.reply_text(f"❌ Xato: {str(e)[:200]}")
 
+from aiohttp import web
+import threading
+
+def run_health_server():
+    port = int(os.environ.get("PORT", 8080))
+    async def health_check(request):
+        return web.Response(text="✅ Telegram Bot is running 24/7!")
+
+    app = web.Application()
+    app.router.add_get('/', health_check)
+    app.router.add_get('/health', health_check)
+    runner = web.AppRunner(app)
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(runner.setup())
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    loop.run_until_complete(site.start())
+    logger.info(f"🌐 Render Health Check HTTP server running on port {port}")
+    loop.run_forever()
+
 def main():
-    logger.info("🤖 Voice & Text to Styled Excel (.xlsx) Bot with Clean Uzbek Text Sanitizer...")
+    try:
+        threading.Thread(target=run_health_server, daemon=True).start()
+    except Exception as h_err:
+        logger.warning(f"Health server error: {h_err}")
+
+    logger.info("🤖 Voice & Text to Styled Excel (.xlsx) Bot with Clean Uzbek Text Sanitizer & 24/7 Health Server...")
     app = (
         Application.builder()
         .token(BOT_TOKEN)
