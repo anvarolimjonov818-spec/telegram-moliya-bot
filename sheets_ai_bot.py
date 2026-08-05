@@ -902,6 +902,21 @@ def run_health_server():
     async def health_check(request):
         return web.Response(text="✅ Telegram Bot is running 24/7!")
 
+    async def self_ping_task():
+        await asyncio.sleep(15)
+        url = os.environ.get("RENDER_EXTERNAL_URL", "https://telegram-moliya-bot.onrender.com/health")
+        if not url.endswith("/health") and not url.endswith("/"):
+            url = url + "/health"
+        logger.info(f"🔄 Self Keep-Alive pinger target: {url}")
+        async with aiohttp.ClientSession() as session:
+            while True:
+                try:
+                    async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                        logger.info(f"🔄 Self-ping keep-alive status: {resp.status}")
+                except Exception as p_err:
+                    logger.debug(f"Self-ping notice: {p_err}")
+                await asyncio.sleep(240)
+
     app = web.Application()
     app.router.add_get('/', health_check)
     app.router.add_get('/health', health_check)
@@ -913,6 +928,7 @@ def run_health_server():
     site = web.TCPSite(runner, '0.0.0.0', port)
     loop.run_until_complete(site.start())
     logger.info(f"🌐 Render Health Check HTTP server running on port {port}")
+    loop.create_task(self_ping_task())
     loop.run_forever()
 
 def main():
