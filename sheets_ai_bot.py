@@ -187,8 +187,12 @@ def render_in_sheet_summary(ws):
     font_normal = Font(name="Arial", size=10)
     thin_border = Border(left=Side(style='thin', color='D9D9D9'), right=Side(style='thin', color='D9D9D9'), top=Side(style='thin', color='D9D9D9'), bottom=Side(style='thin', color='D9D9D9'))
 
-    max_r = max(ws.max_row + 5, 25)
-    for r in range(1, max_r):
+    data_row_count = 1
+    while ws.cell(row=data_row_count + 1, column=1).value is not None:
+        data_row_count += 1
+
+    max_r = max(data_row_count + 5, 20)
+    for r in range(1, max_r + 1):
         for c in range(11, 15):
             cell = ws.cell(row=r, column=c)
             cell.value = None
@@ -210,7 +214,7 @@ def render_in_sheet_summary(ws):
     total_xarajat = 0
     total_nasiya = 0
 
-    for r_i in range(2, ws.max_row + 1):
+    for r_i in range(2, data_row_count + 1):
         sana_val = ws.cell(row=r_i, column=1).value
         if not sana_val or str(sana_val).startswith("Sana"):
             continue
@@ -541,19 +545,24 @@ async def parse_note_with_ai(text: str = "", audio_b64: str = None) -> dict:
     parsed["vaqt"] = time_str
     return parsed
 
+def get_next_data_row(ws):
+    r = 1
+    while ws.cell(row=r, column=1).value is not None:
+        r += 1
+    return r
+
 def append_row_to_worksheet(ws, row_data):
-    ws.append(row_data)
-    last_row = ws.max_row
+    target_row = get_next_data_row(ws)
 
     thin_border = Border(left=Side(style='thin', color='D9D9D9'), right=Side(style='thin', color='D9D9D9'), top=Side(style='thin', color='D9D9D9'), bottom=Side(style='thin', color='D9D9D9'))
-    fill_color = "F9FBFD" if last_row % 2 == 0 else "FFFFFF"
+    fill_color = "F9FBFD" if target_row % 2 == 0 else "FFFFFF"
     row_fill = PatternFill(start_color=fill_color, end_color=fill_color, fill_type="solid")
     font_data = Font(name="Arial", size=10)
 
-    ws.row_dimensions[last_row].height = 22
+    ws.row_dimensions[target_row].height = 22
 
     for col_idx, val in enumerate(row_data, 1):
-        cell = ws.cell(row=last_row, column=col_idx)
+        cell = ws.cell(row=target_row, column=col_idx, value=val)
         cell.font = font_data
         cell.fill = row_fill
         cell.border = thin_border
