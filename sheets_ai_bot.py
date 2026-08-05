@@ -56,17 +56,17 @@ COLUMN_WIDTHS = {
     "A": 14,  # Sana
     "B": 9,   # Vaqt
     "C": 13,  # Turi
-    "D": 18,  # Shaxs / Mijoz
-    "E": 16,  # Tushum
-    "F": 16,  # Xarajat
-    "G": 16,  # Nasiya
-    "H": 16,  # Kategoriya
-    "I": 32,  # Izoh / Tafsilotlar
-    "J": 3,   # Ajratuvchi bo'sh ustun
-    "K": 20,  # Kategoriya Hisoboti
-    "L": 15,  # Tushum
-    "M": 15,  # Xarajat
-    "N": 15   # Nasiya
+    "D": 20,  # Shaxs / Mijoz
+    "E": 18,  # Tushum
+    "F": 18,  # Xarajat
+    "G": 18,  # Nasiya
+    "H": 18,  # Kategoriya
+    "I": 42,  # Izoh / Tafsilotlar (Keng, sig'adigan)
+    "J": 6,   # Ajratuvchi bo'sh ustun (Katta masofa)
+    "K": 26,  # Kategoriya Hisoboti (Sig'adigan keng ustun)
+    "L": 18,  # Tushum
+    "M": 18,  # Xarajat
+    "N": 18   # Nasiya
 }
 
 MONTH_NAMES_UZ = {
