@@ -941,12 +941,7 @@ def run_health_server():
     loop.run_forever()
 
 def main():
-    try:
-        threading.Thread(target=run_health_server, daemon=True).start()
-    except Exception as h_err:
-        logger.warning(f"Health server error: {h_err}")
-
-    logger.info("🤖 Voice & Text to Styled Excel (.xlsx) Bot with Uzbek Compound Number Support (480.000 so'm)...")
+    logger.info("🤖 Voice & Text to Styled Excel (.xlsx) Bot with Webhook & Uzbek Compound Number Support (480.000 so'm)...")
     app = (
         Application.builder()
         .token(BOT_TOKEN)
@@ -969,8 +964,29 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO | (filters.TEXT & ~filters.COMMAND), handle_text_or_voice))
 
-    logger.info("✅ Bot tayyor!")
-    app.run_polling(drop_pending_updates=True)
+    is_render = os.environ.get("RENDER") or os.environ.get("PORT")
+    port = int(os.environ.get("PORT", 8080))
+    external_url = os.environ.get("RENDER_EXTERNAL_URL", "https://telegram-moliya-bot.onrender.com").strip()
+    if not external_url.startswith("http"):
+        external_url = "https://" + external_url
+
+    if is_render:
+        logger.info(f"🌐 Serverda Webhook rejimida ishga tushmoqda: {external_url}/telegram (Port: {port})...")
+        app.run_webhook(
+            listen="0.0.0.0",
+            port=port,
+            url_path="telegram",
+            webhook_url=f"{external_url}/telegram",
+            drop_pending_updates=True
+        )
+    else:
+        try:
+            threading.Thread(target=run_health_server, daemon=True).start()
+        except Exception as h_err:
+            logger.warning(f"Health server error: {h_err}")
+
+        logger.info("✅ Bot tayyor (Local Polling)!")
+        app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
     main()
