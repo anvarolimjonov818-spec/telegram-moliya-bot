@@ -907,41 +907,57 @@ from aiohttp import web
 import threading
 
 def run_health_server():
-    port = int(os.environ.get("PORT", 8080))
+async def run_server_webhook(app, port: int, external_url: str):
+    webhook_url = f"{external_url}/telegram"
+    logger.info(f"🌐 Setting Telegram Webhook to: {webhook_url}")
+    try:
+        await app.bot.set_webhook(url=webhook_url, drop_pending_updates=True)
+        logger.info("✅ Telegram Webhook successfully set with Telegram API!")
+    except Exception as w_err:
+        logger.error(f"Failed to set webhook: {w_err}")
+
+    async def telegram_webhook_handler(request):
+        try:
+            data = await request.json()
+            update = Update.de_json(data, app.bot)
+            await app.process_update(update)
+            return web.Response(text="OK", status=200)
+        except Exception as e:
+            logger.error(f"Webhook update processing error: {e}")
+            return web.Response(text="OK", status=200)
+
     async def health_check(request):
         return web.Response(text="✅ Telegram Bot is running 24/7!")
 
     async def self_ping_task():
         await asyncio.sleep(15)
-        url = os.environ.get("RENDER_EXTERNAL_URL", "https://telegram-moliya-bot.onrender.com/health")
-        if not url.endswith("/health") and not url.endswith("/"):
-            url = url + "/health"
-        logger.info(f"🔄 Self Keep-Alive pinger target: {url}")
+        ping_url = f"{external_url}/health"
+        logger.info(f"🔄 Self Keep-Alive pinger target: {ping_url}")
         async with aiohttp.ClientSession() as session:
             while True:
                 try:
-                    async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                    async with session.get(ping_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                         logger.info(f"🔄 Self-ping keep-alive status: {resp.status}")
                 except Exception as p_err:
                     logger.debug(f"Self-ping notice: {p_err}")
                 await asyncio.sleep(240)
 
-    app = web.Application()
-    app.router.add_get('/', health_check)
-    app.router.add_get('/health', health_check)
-    runner = web.AppRunner(app)
+    web_app = web.Application()
+    web_app.router.add_get('/', health_check)
+    web_app.router.add_get('/health', health_check)
+    web_app.router.add_post('/telegram', telegram_webhook_handler)
 
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(runner.setup())
+    runner = web.AppRunner(web_app)
+    await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', port)
-    loop.run_until_complete(site.start())
-    logger.info(f"🌐 Render Health Check HTTP server running on port {port}")
-    loop.create_task(self_ping_task())
-    loop.run_forever()
+    await site.start()
+    logger.info(f"🚀 Webhook & Health Check Server active on 0.0.0.0:{port}")
+    asyncio.create_task(self_ping_task())
+
+    await asyncio.Event().wait()
 
 def main():
-    logger.info("🤖 Voice & Text to Styled Excel (.xlsx) Bot with Webhook & Uzbek Compound Number Support (480.000 so'm)...")
+    logger.info("🤖 Voice & Text to Styled Excel (.xlsx) Bot with Robust Webhook Support (480.000 so'm)...")
     app = (
         Application.builder()
         .token(BOT_TOKEN)
@@ -971,20 +987,13 @@ def main():
         external_url = "https://" + external_url
 
     if is_render:
-        logger.info(f"🌐 Serverda Webhook rejimida ishga tushmoqda: {external_url}/telegram (Port: {port})...")
-        app.run_webhook(
-            listen="0.0.0.0",
-            port=port,
-            url_path="telegram",
-            webhook_url=f"{external_url}/telegram",
-            drop_pending_updates=True
-        )
-    else:
-        try:
-            threading.Thread(target=run_health_server, daemon=True).start()
-        except Exception as h_err:
-            logger.warning(f"Health server error: {h_err}")
+        async def start_webhook():
+            await app.initialize()
+            await app.start()
+            await run_server_webhook(app, port, external_url)
 
+        asyncio.run(start_webhook())
+    else:
         logger.info("✅ Bot tayyor (Local Polling)!")
         app.run_polling(drop_pending_updates=True)
 
