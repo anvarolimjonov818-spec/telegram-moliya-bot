@@ -405,11 +405,11 @@ def get_category_totals(target_month_prefix: str = None):
         "sof_foyda": total_tushum - total_xarajat
     }
 
-GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent"
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_WHISPER_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 
-SYSTEM_PROMPT = """Siz O'zbek tili nutqi, iboralari va shevalari bo'yicha mutaxassis AI yordamchisiz.
+SYSTEM_PROMPT = """Siz O'zbek tili nutqi, moliya iboralari va shevalari bo'yicha mutaxassis AI yordamchisiz.
 Foydalanuvchi ovozli yoki matnli xabarda nima degan bo'lsa (lotin yoki kirill alifbosida), uni quyidagi JSON formatiga o'giring.
 
 O'ZBEKCHA OVOZLI XABARLARNI VA MURAKKAB SONLARNI 100% ANIQLIKDA TUZATISH QOIDALARI:
@@ -424,17 +424,19 @@ O'ZBEKCHA OVOZLI XABARLARNI VA MURAKKAB SONLARNI 100% ANIQLIKDA TUZATISH QOIDALA
    - "yigirma ming" / "20 ming" = 20000 so'm
    - "o'n ming" / "10 ming" = 10000 so'm
    - "bir million" / "1 mln" = 1000000 so'm
+   - "bir yarim million" = 1500000 so'm
+   - "yigirma besh ming" = 250000 so'm emas, 25000 so'm!
 
 2. STT SHOVQIN SO'ZLARINI TOZALASH:
-   - "get over zikim", "subtitles", "amara" kabi shovqin so'zlarni batamom o'chirib tashlang.
+   - "get over zikim", "subtitles", "amara", "thank you" kabi shovqin so'zlarni batamom o'chirib tashlang.
    - "toza_matn" maydonida FAQAT toza o'zbekcha chiroyli jumlani qaytaring (Masalan: "Dastur uchun 480 000 so'm to'lov qildim").
 
 3. TURI VA KATEGORIYANI ANIQLASH:
-   - Agar "qildim", "berdim", "sotib oldim", "to'ladim" bo'lsa -> "Xarajat"
-   - Agar "oldim", "tushdi", "sotdim", "berdi" bo'lsa -> "Tushum"
-   - Agar "nasiya", "qarz" bo'lsa -> "Nasiya"
+   - Agar "qildim", "berdim", "sotib oldim", "to'ladim", "xarajat" bo'lsa -> "Xarajat"
+   - Agar "oldim", "tushdi", "sotdim", "berdi", "foyda" bo'lsa -> "Tushum"
+   - Agar "nasiya", "qarz", "keyin beradi", "kutayapman" bo'lsa -> "Nasiya"
 
-Javobingiz FAQAT va FAQAT toza JSON bo'lishi shart (hech qanday markdown prefiksiz, ```json siz):
+Javobingiz FAQAT va FAQAT toza JSON bo'lishi shart:
 
 {
   "turi": "Tushum" yoki "Xarajat" yoki "Nasiya",
@@ -454,7 +456,7 @@ async def transcribe_audio_with_groq(audio_bytes: bytes) -> str:
     form.add_field('model', 'whisper-large-v3-turbo')
     form.add_field('language', 'uz')
     form.add_field('temperature', '0.0')
-    form.add_field('prompt', "O'zbek tilidagi moliya va xarajatlar: to'rt yuz sakson ming so'm to'lov qildim, 480 ming so'm, uch yuz ellik ming, sakson ming so'm, benzinga yigirma ming, gazga 25 ming.")
+    form.add_field('prompt', "O'zbek tilidagi moliya, tushum va xarajatlar: to'rt yuz sakson ming so'm to'lov qildim, 480 ming so'm, uch yuz ellik ming, sakson ming so'm, benzinga yigirma besh ming, tushlikka 45 ming, Alisherdan 500 ming tushum oldim, nasiya qarz 1 million so'm.")
 
     async with aiohttp.ClientSession() as session:
         async with session.post(GROQ_WHISPER_URL, data=form, headers=headers, timeout=aiohttp.ClientTimeout(total=45)) as resp:
@@ -489,7 +491,7 @@ async def call_gemini_parser(prompt_text: str, audio_b64: str = None) -> str:
 
 async def call_groq_parser(prompt_text: str) -> str:
     body = {
-        "model": "llama-3.3-70b-versatile",
+        "model": "openai/gpt-oss-120b",
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": prompt_text}
@@ -906,7 +908,6 @@ async def handle_text_or_voice(update: Update, context: ContextTypes.DEFAULT_TYP
 from aiohttp import web
 import threading
 
-def run_health_server():
 async def run_server_webhook(app, port: int, external_url: str):
     webhook_url = f"{external_url}/telegram"
     logger.info(f"🌐 Setting Telegram Webhook to: {webhook_url}")
@@ -920,7 +921,7 @@ async def run_server_webhook(app, port: int, external_url: str):
         try:
             data = await request.json()
             update = Update.de_json(data, app.bot)
-            await app.process_update(update)
+            asyncio.create_task(app.process_update(update))
             return web.Response(text="OK", status=200)
         except Exception as e:
             logger.error(f"Webhook update processing error: {e}")
