@@ -387,7 +387,7 @@ def render_in_sheet_summary(ws):
         if not cat:
             cat = "Boshqa"
 
-        is_qarz_qaytdi = ("qaytdi" in turi_val) or ("qarzini qaytardi" in izoh_c) or ("qarz qaytdi" in izoh_c) or ("nasiyani to'ladi" in izoh_c)
+        is_qarz_qaytdi = ("qaytdi" in turi_val) or ("qarzini qaytardi" in izoh_c) or ("qarz qaytdi" in izoh_c) or ("nasiyani yopdi" in izoh_c)
 
         if is_qarz_qaytdi:
             qaytgan_summa = n_val if n_val > 0 else t_val
@@ -694,10 +694,13 @@ Agar xabarda qarz qachon qaytarilishi aytilgan bo'lsa (masalan: "29 oktyabr qayt
 - "qaytarish_sanasi" maydoniga YYYY-MM-DD ko'rinishida sana yozing (Masalan: "2026-10-29").
 - Agar aytilmagan bo'lsa -> null bo'lsin.
 
-TELEFON RAQAM VA QO'SHIMCHA MA'LUMOTLAR:
-- Agar xabarda telefon raqami aytilgan bo'lsa (masalan: "nomeri 901234567", "+998 99 888 77 66"):
-  - "telefon" maydoniga tozalab kiriting (Masalan: "+998901234567").
+TELEFON RAQAM VA QO'SHIMCHA MA'LUMOTLARNI 100% TO'G'RI AJRATISH:
+- O'zbekistondagi telefon raqamlari 9 ta raqamdan iborat (masalan: 90 046 16 08 yoki 99 123 45 67 yoki 900461608).
+- Foydalanuvchi "telefon nomeri 90 046 16 08" yoki "raqami 900461608" deb aytsa:
+  - "telefon" maydoniga FAQAT va FAQAT shu 9 ta raqamni "+998" bilan boshlab yozing: "+998900461608".
+  - Boshqa hech qanday so'zni, summani yoki sanani telefon raqamiga ARALASHTIRMANG! 9 ta raqamdan ortiq bo'lmasin!
   - Agar telefon aytilmagan bo'lsa -> "" (bo'sh qolsin).
+- Shaxs ismini aniq yozing (Masalan: "Doniyorga" desa, ism "Doniyor" bo'lsin, "Don Yorga" emas!).
 - "izoh" maydoniga foydalanuvchi aytgan har qanday qo'shimcha tafsilotlar, eslatmalar yoki shartlarni to'liq kiriting.
 
 O'ZBEKCHA MURAKKAB SONLAR (To'liq hisoblang!):
@@ -1316,9 +1319,9 @@ async def run_server_webhook(app, port: int, external_url: str):
             if r.get("qaytarish_sanasi") and not debt_persons[shaxs]["qaytarish_sanasi"]:
                 debt_persons[shaxs]["qaytarish_sanasi"] = r.get("qaytarish_sanasi")
 
-            if "qaytdi" in turi or "qaytar" in izoh:
+            if "qaytdi" in turi or "qarzini qaytardi" in izoh or "qarz qaytdi" in izoh or "nasiyani yopdi" in izoh:
                 debt_persons[shaxs]["total_qaytdi"] += (nasiya_s if nasiya_s > 0 else tushum_s)
-            elif "nasiya" in turi or "berildi" in turi or nasiya_s > 0:
+            elif "berildi" in turi or "qarz berdim" in izoh or "nasiyaga berdim" in izoh or nasiya_s > 0:
                 debt_persons[shaxs]["total_berildi"] += nasiya_s
 
         active_debts = []
@@ -1336,7 +1339,6 @@ async def run_server_webhook(app, port: int, external_url: str):
                     "muddati_otgan": is_overdue
                 })
 
-        # Summary ko'rsatkichlar
         total_tushum = stats.get("total_tushum", 0)
         total_xarajat = stats.get("total_xarajat", 0)
         total_nasiya_b = stats.get("total_nasiya", 0)
