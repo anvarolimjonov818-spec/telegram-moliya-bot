@@ -121,9 +121,12 @@ async def check_debt_reminders_task(app):
                         continue
 
                     # Agar qoldiq qolgan bo'lsa ogohlantiramiz
+                    tel = item.get('telefon', '')
+                    tel_text = f"\n📞 **Telefon:** `{tel}`" if tel else ""
+
                     msg_text = (
                         f"🔔 **QARZNI QAYTARISH MUDDATI KELDI!** ⏰\n\n"
-                        f"👤 **Mijoz / Shaxs:** `{shaxs}`\n"
+                        f"👤 **Mijoz / Shaxs:** `{shaxs}`{tel_text}\n"
                         f"📅 **Qarz olingan sana:** `{item.get('berilgan_sana')}`\n"
                         f"🎯 **Qaytarish kerak bo'lgan sana:** `{due_date}`\n"
                         f"💰 **Dastlabki olingan qarz:** `{int(item.get('boshlangich_qarz', 0)):,} so'm`\n"
@@ -162,26 +165,28 @@ EXCEL_FILE_PATH = "Mening_Moliya_Jadvalim.xlsx"
 CSV_FILE_PATH = "Mening_Moliya_Jadvalim.csv"
 
 HEADERS = [
-    "Sana", "Vaqt", "Turi", "Shaxs / Mijoz",
+    "Sana", "Vaqt", "Turi", "Shaxs / Mijoz", "Telefon",
     "Tushum (so'm)", "Xarajat (so'm)", "Nasiya (so'm)",
-    "Kategoriya", "Izoh / Tafsilotlar"
+    "Qaytarish Sanasi", "Kategoriya", "Izoh / Tafsilotlar"
 ]
 
 COLUMN_WIDTHS = {
-    "A": 14,  # Sana
-    "B": 9,   # Vaqt
-    "C": 13,  # Turi
-    "D": 20,  # Shaxs / Mijoz
-    "E": 18,  # Tushum
-    "F": 18,  # Xarajat
-    "G": 18,  # Nasiya
-    "H": 18,  # Kategoriya
-    "I": 42,  # Izoh / Tafsilotlar (Keng, sig'adigan)
-    "J": 6,   # Ajratuvchi bo'sh ustun (Katta masofa)
-    "K": 26,  # Kategoriya Hisoboti (Sig'adigan keng ustun)
-    "L": 18,  # Tushum
-    "M": 18,  # Xarajat
-    "N": 18   # Nasiya
+    "A": 13,  # Sana
+    "B": 8,   # Vaqt
+    "C": 15,  # Turi
+    "D": 18,  # Shaxs / Mijoz
+    "E": 16,  # Telefon
+    "F": 17,  # Tushum
+    "G": 17,  # Xarajat
+    "H": 17,  # Nasiya
+    "I": 16,  # Qaytarish Sanasi
+    "J": 18,  # Kategoriya
+    "K": 38,  # Izoh / Tafsilotlar
+    "L": 5,   # Ajratuvchi bo'sh ustun
+    "M": 26,  # Kategoriya Hisoboti
+    "N": 17,  # Tushum
+    "O": 17,  # Xarajat
+    "P": 17   # Nasiya
 }
 
 MONTH_NAMES_UZ = {
@@ -288,17 +293,28 @@ def get_all_rows():
             headers = next(reader, None)
             for idx, row in enumerate(reader, 1):
                 if len(row) >= 9:
+                    # Yangi format: 11 ustun
+                    telefon = row[4] if len(row) >= 11 else ""
+                    tushum = row[5] if len(row) >= 11 else row[4]
+                    xarajat = row[6] if len(row) >= 11 else row[5]
+                    nasiya = row[7] if len(row) >= 11 else row[6]
+                    due_date = row[8] if len(row) >= 11 else ""
+                    kategoriya = row[9] if len(row) >= 11 else row[7]
+                    izoh = row[10] if len(row) >= 11 else row[8]
+
                     rows.append({
                         "id": idx,
                         "sana": row[0],
                         "vaqt": row[1],
                         "turi": row[2],
                         "shaxs": row[3],
-                        "tushum": row[4],
-                        "xarajat": row[5],
-                        "nasiya": row[6],
-                        "kategoriya": row[7],
-                        "izoh": row[8]
+                        "telefon": telefon,
+                        "tushum": int(tushum) if str(tushum).isdigit() else 0,
+                        "xarajat": int(xarajat) if str(xarajat).isdigit() else 0,
+                        "nasiya": int(nasiya) if str(nasiya).isdigit() else 0,
+                        "qaytarish_sanasi": due_date,
+                        "kategoriya": kategoriya,
+                        "izoh": izoh
                     })
     return rows
 
@@ -309,18 +325,18 @@ def render_in_sheet_summary(ws):
     font_normal = Font(name="Arial", size=10)
     thin_border = Border(left=Side(style='thin', color='D9D9D9'), right=Side(style='thin', color='D9D9D9'), top=Side(style='thin', color='D9D9D9'), bottom=Side(style='thin', color='D9D9D9'))
 
-    # 1. O'ng tarafdagi (K dan N gacha) barcha eski xulosalarni tozalaymiz
+    # 1. O'ng tarafdagi (M dan P gacha: 13-16 ustunlar) barcha eski xulosalarni tozalaymiz
     max_clean_row = max(ws.max_row + 15, 30)
     for r in range(1, max_clean_row + 1):
-        for c in range(11, 15):
+        for c in range(13, 17):
             cell = ws.cell(row=r, column=c)
             cell.value = None
             cell.fill = PatternFill(fill_type=None)
             cell.border = Border()
 
-    # 2. Xulosa sarlavhalari (1-qatorda)
+    # 2. Xulosa sarlavhalari (1-qatorda, 13-ustundan boshlab)
     sum_headers = ["Kategoriya (Hisobot)", "Tushum (so'm)", "Xarajat (so'm)", "Nasiya (so'm)"]
-    for idx, h_text in enumerate(sum_headers, 11):
+    for idx, h_text in enumerate(sum_headers, 13):
         cell = ws.cell(row=1, column=idx, value=h_text)
         cell.font = font_header
         cell.fill = fill_header
@@ -348,17 +364,20 @@ def render_in_sheet_summary(ws):
             return 0
 
     # 3. 2-qatordan boshlab barcha ma'lumotlarni o'qiymiz
+    # Yangi ustunlar:
+    # 1: Sana, 2: Vaqt, 3: Turi, 4: Shaxs, 5: Telefon
+    # 6: Tushum, 7: Xarajat, 8: Nasiya, 9: Qaytarish Sanasi, 10: Kategoriya, 11: Izoh
     for r_i in range(2, ws.max_row + 1):
         sana_val = ws.cell(row=r_i, column=1).value
         if not sana_val or str(sana_val).strip() == "Sana":
             continue
 
         turi_val = str(ws.cell(row=r_i, column=3).value or "").strip().lower()
-        t_c = ws.cell(row=r_i, column=5).value
-        x_c = ws.cell(row=r_i, column=6).value
-        n_c = ws.cell(row=r_i, column=7).value
-        cat_c = ws.cell(row=r_i, column=8).value
-        izoh_c = str(ws.cell(row=r_i, column=9).value or "").lower()
+        t_c = ws.cell(row=r_i, column=6).value
+        x_c = ws.cell(row=r_i, column=7).value
+        n_c = ws.cell(row=r_i, column=8).value
+        cat_c = ws.cell(row=r_i, column=10).value
+        izoh_c = str(ws.cell(row=r_i, column=11).value or "").lower()
 
         t_val = parse_num(t_c)
         x_val = parse_num(x_c)
@@ -368,13 +387,11 @@ def render_in_sheet_summary(ws):
         if not cat:
             cat = "Boshqa"
 
-        # Qarz qaytganini aniqlash (turi bo'yicha yoki izoh bo'yicha)
         is_qarz_qaytdi = ("qaytdi" in turi_val) or ("qarzini qaytardi" in izoh_c) or ("qarz qaytdi" in izoh_c) or ("nasiyani to'ladi" in izoh_c)
 
         if is_qarz_qaytdi:
             qaytgan_summa = n_val if n_val > 0 else t_val
             total_nasiya_qaytdi += qaytgan_summa
-            # Bu sof savdo emas, shuning uchun tushum_by_cat ga sof daromad sifatida qo'shilmaydi
         else:
             if t_val > 0:
                 tushum_by_cat[cat] = tushum_by_cat.get(cat, 0) + t_val
@@ -396,13 +413,13 @@ def render_in_sheet_summary(ws):
 
         fill_r = PatternFill(start_color="F9FBFD" if current_row % 2 == 0 else "FFFFFF", fill_type="solid")
 
-        c1 = ws.cell(row=current_row, column=11, value=cat)
+        c1 = ws.cell(row=current_row, column=13, value=cat)
         c1.font = font_normal
         c1.fill = fill_r
         c1.border = thin_border
         c1.alignment = Alignment(horizontal="left", vertical="center")
 
-        for c_idx, val in enumerate([t_val, x_val, n_val], 12):
+        for c_idx, val in enumerate([t_val, x_val, n_val], 14):
             cell = ws.cell(row=current_row, column=c_idx, value=val)
             cell.font = font_normal
             cell.fill = fill_r
@@ -416,12 +433,12 @@ def render_in_sheet_summary(ws):
     # JAMI TOTAL
     fill_tot = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
     tot_vals = ["JAMI TOTAL", total_tushum, total_xarajat, total_nasiya_berildi]
-    for idx, val in enumerate(tot_vals, 11):
+    for idx, val in enumerate(tot_vals, 13):
         cell = ws.cell(row=current_row, column=idx, value=val)
         cell.font = font_bold
         cell.fill = fill_tot
         cell.border = thin_border
-        if idx > 11:
+        if idx > 13:
             cell.alignment = Alignment(horizontal="right", vertical="center")
             cell.number_format = '#,##0'
         else:
@@ -430,22 +447,22 @@ def render_in_sheet_summary(ws):
     ws.row_dimensions[current_row].height = 24
     current_row += 1
 
-    # 1. SOF FOYDA = Haqiqiy Tushum - Xarajat (Qarz qaytishi va berilishi foydaga kirmaydi!)
+    # 1. SOF FOYDA = Haqiqiy Tushum - Xarajat
     sof_foyda = total_tushum - total_xarajat
     fill_profit = PatternFill(start_color="E2EFDA" if sof_foyda >= 0 else "FCE4D6", fill_type="solid")
-    c_p1 = ws.cell(row=current_row, column=11, value="SOF FOYDA")
+    c_p1 = ws.cell(row=current_row, column=13, value="SOF FOYDA")
     c_p1.font = font_bold
     c_p1.fill = fill_profit
     c_p1.border = thin_border
 
-    c_p2 = ws.cell(row=current_row, column=12, value=sof_foyda)
+    c_p2 = ws.cell(row=current_row, column=14, value=sof_foyda)
     c_p2.font = font_bold
     c_p2.fill = fill_profit
     c_p2.border = thin_border
     c_p2.alignment = Alignment(horizontal="right", vertical="center")
     c_p2.number_format = '#,##0'
 
-    for c_i in range(13, 15):
+    for c_i in range(15, 17):
         c_empty = ws.cell(row=current_row, column=c_i, value="")
         c_empty.fill = fill_profit
         c_empty.border = thin_border
@@ -456,19 +473,19 @@ def render_in_sheet_summary(ws):
     # 2. QARZLAR QOLDIG'I (Nasiya) = Berilgan qarz - Qaytarilgan qarz
     nasiya_qoldiq = total_nasiya_berildi - total_nasiya_qaytdi
     fill_debt = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
-    c_d1 = ws.cell(row=current_row, column=11, value="QARZ QOLDIG'I")
+    c_d1 = ws.cell(row=current_row, column=13, value="QARZ QOLDIG'I")
     c_d1.font = font_bold
     c_d1.fill = fill_debt
     c_d1.border = thin_border
 
-    c_d4 = ws.cell(row=current_row, column=14, value=nasiya_qoldiq)
+    c_d4 = ws.cell(row=current_row, column=16, value=nasiya_qoldiq)
     c_d4.font = font_bold
     c_d4.fill = fill_debt
     c_d4.border = thin_border
     c_d4.alignment = Alignment(horizontal="right", vertical="center")
     c_d4.number_format = '#,##0'
 
-    for c_i in (12, 13):
+    for c_i in (14, 15):
         c_empty = ws.cell(row=current_row, column=c_i, value="")
         c_empty.fill = fill_debt
         c_empty.border = thin_border
@@ -477,22 +494,21 @@ def render_in_sheet_summary(ws):
     current_row += 1
 
     # 3. KASSA / CHO'NTAK QOLDIG'I (Real bor pul):
-    # Kassa = (Haqiqiy Tushum + Qaytgan Nasiya) - (Xarajat + Berilgan Nasiya)
     kassa_balansi = (total_tushum + total_nasiya_qaytdi) - (total_xarajat + total_nasiya_berildi)
     fill_kassa = PatternFill(start_color="BDD7EE", end_color="BDD7EE", fill_type="solid")
-    c_k1 = ws.cell(row=current_row, column=11, value="KASSA BALANSI")
+    c_k1 = ws.cell(row=current_row, column=13, value="KASSA BALANSI")
     c_k1.font = font_bold
     c_k1.fill = fill_kassa
     c_k1.border = thin_border
 
-    c_k2 = ws.cell(row=current_row, column=12, value=kassa_balansi)
+    c_k2 = ws.cell(row=current_row, column=14, value=kassa_balansi)
     c_k2.font = font_bold
     c_k2.fill = fill_kassa
     c_k2.border = thin_border
     c_k2.alignment = Alignment(horizontal="right", vertical="center")
     c_k2.number_format = '#,##0'
 
-    for c_i in range(13, 15):
+    for c_i in range(15, 17):
         c_empty = ws.cell(row=current_row, column=c_i, value="")
         c_empty.fill = fill_kassa
         c_empty.border = thin_border
@@ -516,8 +532,8 @@ def delete_specific_row(data_row_id: int):
                 "sana": removed[0],
                 "vaqt": removed[1],
                 "turi": removed[2],
-                "summa": removed[4] if int(removed[4] or 0) > 0 else removed[5],
-                "izoh": removed[8]
+                "shaxs": removed[3] if len(removed) > 3 else "",
+                "izoh": removed[10] if len(removed) >= 11 else (removed[8] if len(removed) > 8 else "")
             }
 
             with open(CSV_FILE_PATH, mode='w', newline='', encoding='utf-8-sig') as f:
@@ -537,6 +553,76 @@ def delete_specific_row(data_row_id: int):
         wb.save(EXCEL_FILE_PATH)
 
     return deleted_info
+
+def update_or_add_record(record: dict):
+    """Web App orqali yozuvni qo'shish yoki tahrirlash"""
+    rec_id = record.get("id")
+
+    with open(CSV_FILE_PATH, mode='r', encoding='utf-8-sig') as f:
+        rows = list(csv.reader(f, delimiter=';'))
+
+    header = rows[0] if rows else HEADERS
+    data_rows = rows[1:] if len(rows) > 1 else []
+
+    now = datetime.datetime.now()
+    sana = record.get("sana") or now.strftime("%Y-%m-%d")
+    vaqt = record.get("vaqt") or now.strftime("%H:%M")
+
+    new_row = [
+        sana,
+        vaqt,
+        record.get("turi", "Tushum"),
+        record.get("shaxs", "Noma'lum"),
+        record.get("telefon", "") or "",
+        str(record.get("tushum_som", 0)),
+        str(record.get("xarajat_som", 0)),
+        str(record.get("nasiya_som", 0)),
+        record.get("qaytarish_sanasi", "") or "",
+        record.get("kategoriya", "Boshqa"),
+        record.get("izoh", "")
+    ]
+
+    if rec_id and 1 <= int(rec_id) <= len(data_rows):
+        # Mavjud qatorni yangilash
+        data_rows[int(rec_id) - 1] = new_row
+    else:
+        # Yangi qator qo'shish
+        data_rows.append(new_row)
+
+    # CSV ga qayta yozish
+    with open(CSV_FILE_PATH, mode='w', newline='', encoding='utf-8-sig') as f:
+        writer = csv.writer(f, delimiter=';')
+        writer.writerow(header)
+        writer.writerows(data_rows)
+
+    # Excelni qayta toza yig'ish
+    wb = openpyxl.Workbook()
+    ws_all = wb.active
+    ws_all.title = "Barcha Yozuvlar"
+    setup_sheet_header(ws_all)
+
+    for r in data_rows:
+        row_formatted = [
+            r[0], r[1], r[2], r[3], r[4],
+            int(r[5]) if str(r[5]).isdigit() else 0,
+            int(r[6]) if str(r[6]).isdigit() else 0,
+            int(r[7]) if str(r[7]).isdigit() else 0,
+            r[8], r[9], r[10] if len(r) > 10 else ""
+        ]
+        append_row_to_worksheet(ws_all, row_formatted)
+        m_name = get_month_sheet_title(r[0])
+        if m_name not in wb.sheetnames:
+            ws_m = wb.create_sheet(m_name)
+            setup_sheet_header(ws_m)
+        else:
+            ws_m = wb[m_name]
+        append_row_to_worksheet(ws_m, row_formatted)
+
+    for s in wb.sheetnames:
+        render_in_sheet_summary(wb[s])
+
+    wb.save(EXCEL_FILE_PATH)
+    return True
 
 def delete_last_entry():
     rows = get_all_rows()
@@ -603,10 +689,16 @@ MOLIYAVIY OPERATSIYA TURLARI (MUHIM QOIDALAR):
 4. "Nasiya qaytdi" — Avval berilgan qarz yoki nasiya qaytarib berilganda (Masalan: "Doniyor qarzini qaytardi 200 ming", "Alidan qarzimni oldim 100 ming", "Nasiyani yopdi").
    * DIQQAT: Qarz qaytishi SOF DAROMAD EMAS! Uning turi qat'iy "Nasiya qaytdi" bo'lishi shart!
 
-QARZNI QAYTARISH MUDDATI (ESLATMA):
-Agar foydalanuvchi qarz qachon qaytarilishini aytgan bo'lsa (masalan: "29 oktyabrda qaytaradi", "juma kuni beradi", "10 kundan keyin", "2026-10-29"):
-- "qaytarish_sanasi" maydoniga formatda YYYY-MM-DD ko'rinishida aniq sana kiriting (Masalan: "2026-10-29").
-- Agar qaytarish muddati aytilmagan bo'lsa -> null bo'lsin.
+QARZNI QAYTARISH MUDDATI:
+Agar xabarda qarz qachon qaytarilishi aytilgan bo'lsa (masalan: "29 oktyabr qaytaradi", "juma kuni beradi", "10 kundan keyin", "oy oxirida"):
+- "qaytarish_sanasi" maydoniga YYYY-MM-DD ko'rinishida sana yozing (Masalan: "2026-10-29").
+- Agar aytilmagan bo'lsa -> null bo'lsin.
+
+TELEFON RAQAM VA QO'SHIMCHA MA'LUMOTLAR:
+- Agar xabarda telefon raqami aytilgan bo'lsa (masalan: "nomeri 901234567", "+998 99 888 77 66"):
+  - "telefon" maydoniga tozalab kiriting (Masalan: "+998901234567").
+  - Agar telefon aytilmagan bo'lsa -> "" (bo'sh qolsin).
+- "izoh" maydoniga foydalanuvchi aytgan har qanday qo'shimcha tafsilotlar, eslatmalar yoki shartlarni to'liq kiriting.
 
 O'ZBEKCHA MURAKKAB SONLAR (To'liq hisoblang!):
 - "to'rt yuz sakson ming" / "480k" = 480000 so'm
@@ -615,23 +707,24 @@ O'ZBEKCHA MURAKKAB SONLAR (To'liq hisoblang!):
 - "bir yarim million" = 1500000 so'm
 - "bir million" = 1000000 so'm
 - "sakson ming" = 80000 so'm
-- "yigirma besh ming" = 25000 so'm (250 ming emas!)
+- "yigirma besh ming" = 25000 so'm
 
 Javobingiz FAQAT toza JSON bo'lishi shart:
 {
   "turi": "Tushum" yoki "Xarajat" yoki "Nasiya berildi" yoki "Nasiya qaytdi",
   "shaxs": "Mijoz yoki shaxs ismi (bo'lmasa 'Noma'lum')",
+  "telefon": "+998XXXXXXXXX yoki bo'sh",
   "tushum_som": 0,
   "xarajat_som": 0,
   "nasiya_som": 0,
   "kategoriya": "Savdo/Qarz munosabatlari/Oziq-ovqat/Transport/Kommunal/Boshqa",
-  "izoh": "Tafsilotli qisqa izoh",
+  "izoh": "Tafsilotli to'liq izoh",
   "toza_matn": "Shovqinsiz chiroyli toza o'zbekcha jumla",
-  "qaytarish_sanasi": "YYYY-MM-DD" yoki null
+  "qaytarish_sanasi": "YYYY-MM-DD yoki null"
 }
 * Eslatma:
-- "Nasiya berildi" bo'lsa -> nasiya_som ga summani yozing (masalan 200000), tushum va xarajat 0 bo'lsin.
-- "Nasiya qaytdi" bo'lsa -> nasiya_som ga summani yozing (masalan 200000), tushum va xarajat 0 bo'lsin."""
+- "Nasiya berildi" bo'lsa -> nasiya_som ga summani yozing, tushum va xarajat 0 bo'lsin.
+- "Nasiya qaytdi" bo'lsa -> nasiya_som ga summani yozing, tushum va xarajat 0 bo'lsin."""
 
 async def transcribe_audio_with_groq(audio_bytes: bytes) -> str:
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
@@ -785,9 +878,11 @@ def append_to_excel_and_csv(data: dict):
             data.get("vaqt", ""),
             data.get("turi", "Tushum"),
             data.get("shaxs", "Noma'lum"),
+            data.get("telefon", ""),
             data.get("tushum_som", 0),
             data.get("xarajat_som", 0),
             data.get("nasiya_som", 0),
+            data.get("qaytarish_sanasi", "") or "",
             data.get("kategoriya", "Boshqa"),
             data.get("izoh", "")
         ])
@@ -802,9 +897,11 @@ def append_to_excel_and_csv(data: dict):
         data.get("vaqt", ""),
         data.get("turi", "Tushum"),
         data.get("shaxs", "Noma'lum"),
+        data.get("telefon", "") or "",
         int(data.get("tushum_som", 0)),
         int(data.get("xarajat_som", 0)),
         int(data.get("nasiya_som", 0)),
+        data.get("qaytarish_sanasi", "") or "",
         data.get("kategoriya", "Boshqa"),
         data.get("izoh", "")
     ]
@@ -827,21 +924,31 @@ def append_to_excel_and_csv(data: dict):
 
     wb.save(EXCEL_FILE_PATH)
 
+WEB_APP_URL = os.environ.get("WEB_APP_URL", "https://moliya-webapp.vercel.app").strip()
+if not WEB_APP_URL.startswith("http"):
+    WEB_APP_URL = "https://" + WEB_APP_URL
+
+from telegram import WebAppInfo
+
 def get_action_keyboard():
     keyboard = [
+        [
+            InlineKeyboardButton("📱 Moliya & Qarz Web Ilovasi", web_app=WebAppInfo(url=WEB_APP_URL)),
+        ],
         [
             InlineKeyboardButton("📋 Yozuvlar Ro'yxati", callback_data="show_rows_list"),
             InlineKeyboardButton("📈 Kategoriyalar Hisoboti", callback_data="category_report"),
         ],
         [
             InlineKeyboardButton("📊 Excel Faylini Yuklash (.xlsx)", callback_data="download_excel"),
-            InlineKeyboardButton("🌐 Google Sheets Onlayn", url="https://sheets.google.com")
+            InlineKeyboardButton("🌐 Web Interfeys (Browser)", url=WEB_APP_URL)
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
 
 def get_reply_menu():
     keyboard = [
+        [KeyboardButton("📱 Moliya & Qarz Ilovasi", web_app=WebAppInfo(url=WEB_APP_URL))],
         [KeyboardButton("📋 Yozuvlarni ko'rish va o'chirish"), KeyboardButton("📈 Kategoriyalar Hisoboti")],
         [KeyboardButton("📊 Excel Jadvalini Yuklash (.xlsx)"), KeyboardButton("ℹ️ Yordam")]
     ]
@@ -1080,6 +1187,7 @@ async def handle_text_or_voice(update: Update, context: ContextTypes.DEFAULT_TYP
             reminders.append({
                 "chat_id": msg.chat.id,
                 "shaxs": res.get("shaxs", "Noma'lum"),
+                "telefon": res.get("telefon", ""),
                 "boshlangich_qarz": int(res.get("nasiya_som", 0)),
                 "berilgan_sana": res.get("sana"),
                 "qaytarish_sanasi": qaytarish_sanasi,
@@ -1102,6 +1210,12 @@ async def handle_text_or_voice(update: Update, context: ContextTypes.DEFAULT_TYP
             f"📅 **Sana:** `{res.get('sana')}` ({res.get('vaqt')})\n"
             f"📌 **Turi:** {res.get('turi')}\n"
             f"👤 **Shaxs/Mijoz:** {res.get('shaxs')}\n"
+        )
+
+        if res.get("telefon"):
+            reply_text += f"📞 **Telefon:** `{res.get('telefon')}`\n"
+
+        reply_text += (
             f"💰 **Tushum:** {int(res.get('tushum_som', 0)):,} so'm\n"
             f"💸 **Xarajat:** {int(res.get('xarajat_som', 0)):,} so'm\n"
             f"⏳ **Nasiya:** {int(res.get('nasiya_som', 0)):,} so'm\n"
@@ -1165,9 +1279,113 @@ async def run_server_webhook(app, port: int, external_url: str):
                     logger.debug(f"Self-ping notice: {p_err}")
                 await asyncio.sleep(240)
 
+    async def serve_index(request):
+        index_path = os.path.join(os.path.dirname(__file__), "static", "index.html")
+        if os.path.exists(index_path):
+            with open(index_path, "r", encoding="utf-8") as f:
+                return web.Response(text=f.read(), content_type="text/html")
+        return web.Response(text="Web App UI yuklanmoqda...")
+
+    async def api_get_data(request):
+        rows = get_all_rows()
+        now = datetime.datetime.now()
+        current_month_prefix = now.strftime("%Y-%m")
+        stats = get_category_totals(target_month_prefix=current_month_prefix)
+        reminders = load_debt_reminders()
+
+        # Faol qarzdorlar ro'yxatini hisoblaymiz
+        debt_persons = {}
+        for r in rows:
+            shaxs = r.get("shaxs") or "Noma'lum"
+            if shaxs not in debt_persons:
+                debt_persons[shaxs] = {
+                    "shaxs": shaxs,
+                    "telefon": r.get("telefon", ""),
+                    "berilgan_sana": r.get("sana", ""),
+                    "qaytarish_sanasi": r.get("qaytarish_sanasi", ""),
+                    "total_berildi": 0,
+                    "total_qaytdi": 0
+                }
+            turi = (r.get("turi") or "").lower()
+            izoh = (r.get("izoh") or "").lower()
+            nasiya_s = r.get("nasiya") or 0
+            tushum_s = r.get("tushum") or 0
+
+            if r.get("telefon") and not debt_persons[shaxs]["telefon"]:
+                debt_persons[shaxs]["telefon"] = r.get("telefon")
+            if r.get("qaytarish_sanasi") and not debt_persons[shaxs]["qaytarish_sanasi"]:
+                debt_persons[shaxs]["qaytarish_sanasi"] = r.get("qaytarish_sanasi")
+
+            if "qaytdi" in turi or "qaytar" in izoh:
+                debt_persons[shaxs]["total_qaytdi"] += (nasiya_s if nasiya_s > 0 else tushum_s)
+            elif "nasiya" in turi or "berildi" in turi or nasiya_s > 0:
+                debt_persons[shaxs]["total_berildi"] += nasiya_s
+
+        active_debts = []
+        today_str = now.strftime("%Y-%m-%d")
+        for p, info in debt_persons.items():
+            qoldiq = info["total_berildi"] - info["total_qaytdi"]
+            if qoldiq > 0:
+                is_overdue = bool(info["qaytarish_sanasi"] and info["qaytarish_sanasi"] < today_str)
+                active_debts.append({
+                    "shaxs": p,
+                    "telefon": info["telefon"],
+                    "qoldiq": qoldiq,
+                    "berilgan_sana": info["berilgan_sana"],
+                    "qaytarish_sanasi": info["qaytarish_sanasi"],
+                    "muddati_otgan": is_overdue
+                })
+
+        # Summary ko'rsatkichlar
+        total_tushum = stats.get("total_tushum", 0)
+        total_xarajat = stats.get("total_xarajat", 0)
+        total_nasiya_b = stats.get("total_nasiya", 0)
+        sof_foyda = total_tushum - total_xarajat
+
+        sum_qoldiq_debt = sum(d["qoldiq"] for d in active_debts)
+        kassa_balansi = total_tushum - total_xarajat - sum_qoldiq_debt
+
+        return web.json_response({
+            "transactions": rows,
+            "debts": active_debts,
+            "summary": {
+                "sof_foyda": sof_foyda,
+                "nasiya_qoldiq": sum_qoldiq_debt,
+                "kassa_balansi": kassa_balansi,
+                "kategoriya_xarajatlar": stats.get("xarajat_by_cat", {})
+            }
+        })
+
+    async def api_save_record(request):
+        try:
+            data = await request.json()
+            update_or_add_record(data)
+            return web.json_response({"ok": True})
+        except Exception as e:
+            return web.json_response({"ok": False, "error": str(e)}, status=500)
+
+    async def api_delete_record(request):
+        try:
+            rec_id = int(request.match_info['id'])
+            delete_specific_row(rec_id)
+            return web.json_response({"ok": True})
+        except Exception as e:
+            return web.json_response({"ok": False, "error": str(e)}, status=500)
+
+    async def serve_download_excel(request):
+        if os.path.exists(EXCEL_FILE_PATH):
+            return web.FileResponse(EXCEL_FILE_PATH, headers={
+                "Content-Disposition": 'attachment; filename="Mening_Moliya_Jadvalim.xlsx"'
+            })
+        return web.Response(text="Fayl topilmadi", status=404)
+
     web_app = web.Application()
-    web_app.router.add_get('/', health_check)
+    web_app.router.add_get('/', serve_index)
     web_app.router.add_get('/health', health_check)
+    web_app.router.add_get('/api/data', api_get_data)
+    web_app.router.add_post('/api/record', api_save_record)
+    web_app.router.add_delete('/api/record/{id}', api_delete_record)
+    web_app.router.add_get('/download-excel', serve_download_excel)
     web_app.router.add_post('/telegram', telegram_webhook_handler)
 
     runner = web.AppRunner(web_app)
