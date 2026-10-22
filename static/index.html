@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Moliya & Qarz Nazorati (CRM)</title>
+  <!-- Telegram WebApp JS SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- SheetJS CDN for direct browser Excel export -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: '#2563eb',
+            income: '#10b981',
+            expense: '#ef4444',
+            debt: '#f59e0b'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .hide-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .hide-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased pb-28">
+
+  <!-- Header & Balance Cards -->
+  <header class="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white px-4 pt-6 pb-8 shadow-xl rounded-b-3xl">
+    <div class="flex items-center justify-between mb-5">
+      <div class="flex items-center space-x-2.5">
+        <div class="w-10 h-10 rounded-2xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-blue-400 font-bold text-xl shadow-inner">
+          <i data-lucide="wallet" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h1 class="text-base font-bold leading-tight">Moliya & Mini-CRM</h1>
+          <p class="text-[11px] text-slate-400">AI Boshqaruv & Qarz Nazorati</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-2">
+        <button onclick="exportToExcel()" class="p-2.5 rounded-xl bg-emerald-500/20 border border-emerald-400/30 hover:bg-emerald-500/30 active:scale-95 transition-all text-emerald-300 flex items-center space-x-1" title="Excel Yuklash">
+          <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+          <span class="text-[11px] font-bold hidden sm:inline">Excel</span>
+        </button>
+        <button onclick="refreshData()" class="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 transition-all text-slate-300" title="Yangilash">
+          <i data-lucide="refresh-cw" id="refresh-icon" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Quick Stats 3-Grid -->
+    <div class="grid grid-cols-3 gap-2.5">
+      <!-- Sof Foyda -->
+      <div class="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-3 flex flex-col justify-between">
+        <div class="flex items-center space-x-1.5 text-emerald-400 text-xs font-medium mb-1">
+          <i data-lucide="trending-up" class="w-3.5 h-3.5"></i>
+          <span>Sof Foyda</span>
+        </div>
+        <div class="text-sm font-black text-white tracking-tight" id="stat-profit">0 so'm</div>
+      </div>
+
+      <!-- Qarz Qoldig'i -->
+      <div class="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-3 flex flex-col justify-between">
+        <div class="flex items-center space-x-1.5 text-amber-400 text-xs font-medium mb-1">
+          <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+          <span>Qarz Qoldiq</span>
+        </div>
+        <div class="text-sm font-black text-white tracking-tight" id="stat-debt">0 so'm</div>
+      </div>
+
+      <!-- Kassa Balansi -->
+      <div class="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-3 flex flex-col justify-between">
+        <div class="flex items-center space-x-1.5 text-cyan-400 text-xs font-medium mb-1">
+          <i data-lucide="banknote" class="w-3.5 h-3.5"></i>
+          <span>Kassa</span>
+        </div>
+        <div class="text-sm font-black text-white tracking-tight" id="stat-cash">0 so'm</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Navigation Tabs -->
+  <div class="px-4 -mt-4">
+    <div class="bg-white p-1 rounded-2xl shadow-lg border border-slate-100 flex space-x-1">
+      <button onclick="switchTab('transactions')" id="tab-btn-transactions" class="flex-1 py-2 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center space-x-1 bg-blue-600 text-white shadow-sm">
+        <i data-lucide="receipt" class="w-3.5 h-3.5"></i>
+        <span>Yozuvlar</span>
+      </button>
+      <button onclick="switchTab('debts')" id="tab-btn-debts" class="flex-1 py-2 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center space-x-1 text-slate-500 hover:text-slate-800">
+        <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+        <span>Qarzlar</span>
+      </button>
+      <button onclick="switchTab('clients')" id="tab-btn-clients" class="flex-1 py-2 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center space-x-1 text-slate-500 hover:text-slate-800">
+        <i data-lucide="users" class="w-3.5 h-3.5"></i>
+        <span>Mijozlar</span>
+      </button>
+      <button onclick="switchTab('analytics')" id="tab-btn-analytics" class="flex-1 py-2 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center space-x-1 text-slate-500 hover:text-slate-800">
+        <i data-lucide="pie-chart" class="w-3.5 h-3.5"></i>
+        <span>Grafik</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- TAB 1: Yozuvlar (Transactions) -->
+  <main id="tab-transactions" class="px-4 mt-5 space-y-4">
+    <!-- Search & Filter Controls -->
+    <div class="flex items-center space-x-2">
+      <div class="relative flex-1">
+        <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+        <input type="text" id="search-input" oninput="renderTransactions()" placeholder="Ism, izoh yoki kategoriya..." class="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm">
+      </div>
+      <select id="type-filter" onchange="renderTransactions()" class="bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm">
+        <option value="ALL">Barchasi</option>
+        <option value="Tushum">Tushum</option>
+        <option value="Xarajat">Xarajat</option>
+        <option value="Nasiya">Nasiya</option>
+      </select>
+    </div>
+
+    <!-- Transaction List -->
+    <div id="transactions-container" class="space-y-3">
+      <div class="text-center py-12 text-slate-400 text-xs">Yuklanmoqda...</div>
+    </div>
+  </main>
+
+  <!-- TAB 2: Qarzdorlar (Debts & Reminders) -->
+  <main id="tab-debts" class="px-4 mt-5 space-y-4 hidden">
+    <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-amber-900 text-xs flex items-start space-x-3 shadow-sm">
+      <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-600 shrink-0 mt-0.5"></i>
+      <div>
+        <p class="font-bold">Qarz qaytarish sanalari nazorati</p>
+        <p class="text-amber-700 text-[11px] mt-0.5">Muddati kelgan qarzdorlarga bitta tugma bilan Telegram yoki SMS orqali eslatma yuboring.</p>
+      </div>
+    </div>
+
+    <div id="debts-container" class="space-y-3">
+      <!-- Dynamic debts injected here -->
+    </div>
+  </main>
+
+  <!-- TAB 3: Mijozlar Bazasi (Mini-CRM) -->
+  <main id="tab-clients" class="px-4 mt-5 space-y-4 hidden">
+    <!-- Search & Filter Controls -->
+    <div class="flex items-center space-x-2">
+      <div class="relative flex-1">
+        <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+        <input type="text" id="client-search-input" oninput="renderClients()" placeholder="Mijoz ismi yoki telefoni..." class="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm">
+      </div>
+      <select id="client-filter" onchange="renderClients()" class="bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm">
+        <option value="ALL">Barcha mijozlar</option>
+        <option value="DEBTORS">Qarzdorlar</option>
+        <option value="CLEAN">Qarzi yo'qlar</option>
+      </select>
+    </div>
+
+    <!-- Client Quick Stats Cards -->
+    <div class="grid grid-cols-3 gap-2 text-center">
+      <div class="bg-white p-2.5 rounded-xl border border-slate-100 shadow-sm">
+        <div class="text-[10px] text-slate-400 font-medium">Jami Mijozlar</div>
+        <div class="text-xs font-black text-slate-800 mt-0.5" id="stat-client-total">0</div>
+      </div>
+      <div class="bg-white p-2.5 rounded-xl border border-slate-100 shadow-sm">
+        <div class="text-[10px] text-rose-500 font-medium">Qarzdorlar</div>
+        <div class="text-xs font-black text-rose-600 mt-0.5" id="stat-client-debtors">0</div>
+      </div>
+      <div class="bg-white p-2.5 rounded-xl border border-slate-100 shadow-sm">
+        <div class="text-[10px] text-emerald-600 font-medium">Jami Aylanma</div>
+        <div class="text-[11px] font-black text-slate-800 mt-0.5 truncate" id="stat-client-turnover">0 so'm</div>
+      </div>
+    </div>
+
+    <!-- Clients List -->
+    <div id="clients-container" class="space-y-3">
+      <!-- Injected dynamically -->
+    </div>
+  </main>
+
+  <!-- TAB 4: Grafiklar & Kategoriyalar -->
+  <main id="tab-analytics" class="px-4 mt-5 space-y-5 hidden">
+    <!-- Chart Box -->
+    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+      <h3 class="text-xs font-bold text-slate-700 mb-4 flex items-center justify-between">
+        <span>Xarajatlar Struktura Taqsimoti</span>
+        <span class="text-[10px] text-slate-400 font-normal">Kategoriya bo'yicha</span>
+      </h3>
+      <div class="relative h-56 flex items-center justify-center">
+        <canvas id="categoryChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Category Summary Table -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+      <div class="p-3.5 bg-slate-50 border-b border-slate-100 font-bold text-xs text-slate-700 flex justify-between">
+        <span>Kategoriya</span>
+        <span>Summa</span>
+      </div>
+      <div id="category-summary-list" class="divide-y divide-slate-100 text-xs">
+        <!-- Injected here -->
+      </div>
+    </div>
+  </main>
+
+  <!-- Bottom Floating Action Bar -->
+  <div class="fixed bottom-0 inset-x-0 p-4 bg-white/90 backdrop-blur-md border-t border-slate-200 flex items-center space-x-3 z-40">
+    <button onclick="openModal('add')" class="flex-1 py-3 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl font-bold text-xs shadow-lg shadow-blue-500/25 flex items-center justify-center space-x-2 transition-all">
+      <i data-lucide="plus-circle" class="w-4 h-4"></i>
+      <span>Yangi Yozuv Qo'shish</span>
+    </button>
+    <button onclick="exportToExcel()" class="p-3 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 rounded-xl transition-all active:scale-95 flex items-center justify-center shadow-sm" title="Excel Yuklab Olish">
+      <i data-lucide="file-spreadsheet" class="w-5 h-5"></i>
+    </button>
+  </div>
+
+  <!-- MIJOZ KARTOCHKASI (MINI-CRM) MODAL -->
+  <div id="client-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center hidden">
+    <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-2xl p-5 shadow-2xl max-h-[92vh] overflow-y-auto space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center space-x-3">
+          <div id="client-modal-avatar" class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-black text-lg flex items-center justify-center shadow-md">
+            D
+          </div>
+          <div>
+            <h3 id="client-modal-name" class="text-sm font-bold text-slate-900">Mijoz Ismi</h3>
+            <p id="client-modal-phone" class="text-xs text-slate-500 font-medium">+998 90 123 45 67</p>
+          </div>
+        </div>
+        <button onclick="closeClientModal()" class="p-1 rounded-full text-slate-400 hover:bg-slate-100">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Financial 3-Stat Summary for Client -->
+      <div class="grid grid-cols-3 gap-2 text-center">
+        <div class="bg-slate-50 p-2.5 rounded-2xl border border-slate-100">
+          <div class="text-[10px] text-slate-400 font-semibold">Jami Aylanma</div>
+          <div id="client-modal-turnover" class="text-xs font-black text-slate-800 mt-1">0 so'm</div>
+        </div>
+        <div class="bg-emerald-50/60 p-2.5 rounded-2xl border border-emerald-100">
+          <div class="text-[10px] text-emerald-700 font-semibold">To'langan</div>
+          <div id="client-modal-paid" class="text-xs font-black text-emerald-600 mt-1">0 so'm</div>
+        </div>
+        <div class="bg-rose-50/60 p-2.5 rounded-2xl border border-rose-100">
+          <div class="text-[10px] text-rose-700 font-semibold">Qarz Qoldig'i</div>
+          <div id="client-modal-debt" class="text-xs font-black text-rose-600 mt-1">0 so'm</div>
+        </div>
+      </div>
+
+      <!-- Quick Contact Actions -->
+      <div class="grid grid-cols-3 gap-2" id="client-modal-contact-actions">
+        <!-- Call, Telegram, SMS injected here -->
+      </div>
+
+      <!-- Client Quick Actions: +Qarz berish or +To'lov qabul qilish -->
+      <div class="grid grid-cols-2 gap-2 pt-1">
+        <button onclick="clientQuickAction('debt')" class="py-2.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-all">
+          <i data-lucide="plus-circle" class="w-3.5 h-3.5 text-amber-600"></i>
+          <span>Nasiya / Qarz berish</span>
+        </button>
+        <button onclick="clientQuickAction('payment')" class="py-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-900 rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-all">
+          <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-600"></i>
+          <span>To'lov Qabul Qilish</span>
+        </button>
+      </div>
+
+      <!-- Transaction History for this client -->
+      <div>
+        <h4 class="text-xs font-bold text-slate-700 mb-2 flex items-center justify-between">
+          <span>Operatsiyalar Tarixi</span>
+          <span id="client-modal-count" class="text-[10px] text-slate-400 font-normal">0 ta yozuv</span>
+        </h4>
+        <div id="client-modal-history" class="space-y-2 max-h-56 overflow-y-auto pr-1">
+          <!-- Injected dynamically -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADD / EDIT TRANSACTION MODAL -->
+  <div id="modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center hidden">
+    <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-2xl p-5 shadow-2xl max-h-[90vh] overflow-y-auto space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 id="modal-title" class="text-sm font-bold text-slate-800">Yangi Yozuv</h3>
+        <button onclick="closeModal()" class="p-1 rounded-full text-slate-400 hover:bg-slate-100">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="record-form" onsubmit="handleFormSubmit(event)" class="space-y-3">
+        <input type="hidden" id="form-id" value="">
+
+        <!-- Turi -->
+        <div>
+          <label class="block text-[11px] font-bold text-slate-600 mb-1">Amal Turi *</label>
+          <div class="grid grid-cols-4 gap-1.5">
+            <label class="cursor-pointer">
+              <input type="radio" name="form-turi" value="Tushum" class="peer sr-only" checked onchange="toggleFormFields()">
+              <div class="py-2 text-center rounded-xl border border-slate-200 text-xs font-bold text-slate-600 peer-checked:bg-emerald-500 peer-checked:text-white peer-checked:border-emerald-500 transition-all">Tushum</div>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="form-turi" value="Xarajat" class="peer sr-only" onchange="toggleFormFields()">
+              <div class="py-2 text-center rounded-xl border border-slate-200 text-xs font-bold text-slate-600 peer-checked:bg-rose-500 peer-checked:text-white peer-checked:border-rose-500 transition-all">Xarajat</div>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="form-turi" value="Nasiya berildi" class="peer sr-only" onchange="toggleFormFields()">
+              <div class="py-2 text-center rounded-xl border border-slate-200 text-xs font-bold text-slate-600 peer-checked:bg-amber-500 peer-checked:text-white peer-checked:border-amber-500 transition-all">Qarz berish</div>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="form-turi" value="Nasiya qaytdi" class="peer sr-only" onchange="toggleFormFields()">
+              <div class="py-2 text-center rounded-xl border border-slate-200 text-xs font-bold text-slate-600 peer-checked:bg-teal-500 peer-checked:text-white peer-checked:border-teal-500 transition-all">Qarz qaytishi</div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Summa -->
+        <div>
+          <label class="block text-[11px] font-bold text-slate-600 mb-1">Summa (so'mda) *</label>
+          <div class="relative">
+            <input type="number" id="form-summa" required placeholder="Masalan: 150000" class="w-full pl-3 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">so'm</span>
+          </div>
+        </div>
+
+        <!-- Shaxs & Telefon -->
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[11px] font-bold text-slate-600 mb-1">Shaxs / Mijoz</label>
+            <input type="text" id="form-shaxs" placeholder="Masalan: Doniyor" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-slate-600 mb-1">Telefon raqam</label>
+            <input type="tel" id="form-telefon" placeholder="+998901234567" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+        </div>
+
+        <!-- Qaytarish Sanasi (Faqat Qarzda ko'rinadi) -->
+        <div id="due-date-container">
+          <label class="block text-[11px] font-bold text-slate-600 mb-1">Qaytarish Sanasi (Muddat)</label>
+          <input type="date" id="form-due-date" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <!-- Kategoriya -->
+        <div>
+          <label class="block text-[11px] font-bold text-slate-600 mb-1">Kategoriya</label>
+          <select id="form-kategoriya" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="Savdo">Savdo / Sotuv</option>
+            <option value="Qarz munosabatlari">Qarz munosabatlari</option>
+            <option value="Oziq-ovqat">Oziq-ovqat / Tushlik</option>
+            <option value="Transport">Transport / Benzin</option>
+            <option value="Kommunal">Kommunal / To'lovlar</option>
+            <option value="Ish haqi">Ish haqi / Oylik</option>
+            <option value="Boshqa" selected>Boshqa</option>
+          </select>
+        </div>
+
+        <!-- Izoh / Tafsilotlar -->
+        <div>
+          <label class="block text-[11px] font-bold text-slate-600 mb-1">Izoh / Tafsilotlar</label>
+          <textarea id="form-izoh" rows="2" placeholder="Qo'shimcha ma'lumotlar..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="pt-2 flex space-x-2">
+          <button type="button" onclick="closeModal()" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-bold text-slate-600 transition-all">Bekor qilish</button>
+          <button type="submit" class="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 transition-all">Saqlash</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // Telegram Web App Initialization
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+      tg.expand();
+      tg.ready();
+    }
+
+    let globalData = {
+      transactions: [],
+      summary: {},
+      debts: []
+    };
+
+    let chartInstance = null;
+
+    // Refresh Data
+    async function refreshData() {
+      const icon = document.getElementById('refresh-icon');
+      if (icon) icon.classList.add('animate-spin');
+
+      try {
+        const resp = await fetch('/api/data');
+        if (!resp.ok) throw new Error('Yuklashda xatolik');
+        globalData = await resp.json();
+        updateUI();
+      } catch (err) {
+        console.error("Data refresh error:", err);
+      } finally {
+        if (icon) icon.classList.remove('animate-spin');
+      }
+    }
+
+    // Update UI elements
+    function updateUI() {
+      // 1. Stats
+      const sum = globalData.summary || {};
+      document.getElementById('stat-profit').textContent = `${(sum.sof_foyda || 0).toLocaleString()} so'm`;
+      document.getElementById('stat-debt').textContent = `${(sum.nasiya_qoldiq || 0).toLocaleString()} so'm`;
+      document.getElementById('stat-cash').textContent = `${(sum.kassa_balansi || 0).toLocaleString()} so'm`;
+
+      // 2. Render tabs
+      renderTransactions();
+      renderDebts();
+      renderClients();
+      renderAnalytics();
+      lucide.createIcons();
+    }
+
+    // Switch Tabs
+    function switchTab(tabId) {
+      ['transactions', 'debts', 'clients', 'analytics'].forEach(t => {
+        const el = document.getElementById(`tab-${t}`);
+        if (el) el.classList.add('hidden');
+        const btn = document.getElementById(`tab-btn-${t}`);
+        if (btn) {
+          btn.classList.remove('bg-blue-600', 'text-white', 'shadow-sm');
+          btn.classList.add('text-slate-500');
+        }
+      });
+
+      const activeTab = document.getElementById(`tab-${tabId}`);
+      if (activeTab) activeTab.classList.remove('hidden');
+      const activeBtn = document.getElementById(`tab-btn-${tabId}`);
+      if (activeBtn) {
+        activeBtn.classList.add('bg-blue-600', 'text-white', 'shadow-sm');
+        activeBtn.classList.remove('text-slate-500');
+      }
+
+      if (tabId === 'analytics') {
+        renderAnalytics();
+      } else if (tabId === 'clients') {
+        renderClients();
+      }
+      lucide.createIcons();
+    }
+
+    // Helper: Calculate 360-degree Clients Map (Mini-CRM)
+    function calculateClientsMap() {
+      const map = {};
+      (globalData.transactions || []).forEach(item => {
+        const rawName = (item.shaxs || "Noma'lum").trim();
+        if (!rawName) return;
+
+        if (!map[rawName]) {
+          map[rawName] = {
+            name: rawName,
+            phone: item.telefon || "",
+            turnover: 0,
+            paid: 0,
+            nasiya_given: 0,
+            nasiya_returned: 0,
+            debt: 0,
+            count: 0,
+            lastDate: item.sana || "",
+            items: []
+          };
+        }
+
+        if (item.telefon && !map[rawName].phone) {
+          map[rawName].phone = item.telefon;
+        }
+
+        map[rawName].count += 1;
+        map[rawName].items.push(item);
+        if (item.sana && item.sana > map[rawName].lastDate) {
+          map[rawName].lastDate = item.sana;
+        }
+
+        const t = (item.turi || "").toLowerCase();
+        const iz = (item.izoh || "").toLowerCase();
+        const tushum = item.tushum || 0;
+        const nasiya = item.nasiya || 0;
+
+        if (t.includes('qaytdi') || iz.includes('qaytardi') || iz.includes('yopdi')) {
+          const s = nasiya > 0 ? nasiya : tushum;
+          map[rawName].nasiya_returned += s;
+          map[rawName].paid += s;
+        } else if (t.includes('nasiya') || t.includes('berildi') || (nasiya > 0 && !t.includes('qaytdi'))) {
+          map[rawName].nasiya_given += nasiya;
+          map[rawName].turnover += nasiya;
+        } else if (t.includes('tushum')) {
+          map[rawName].turnover += tushum;
+          map[rawName].paid += tushum;
+        }
+      });
+
+      // Match with active debts
+      const activeDebtsMap = {};
+      (globalData.debts || []).forEach(d => {
+        activeDebtsMap[d.shaxs.trim().toLowerCase()] = d;
+      });
+
+      Object.values(map).forEach(c => {
+        const dMatch = activeDebtsMap[c.name.toLowerCase()];
+        if (dMatch) {
+          c.debt = dMatch.qoldiq || 0;
+          if (dMatch.telefon && !c.phone) c.phone = dMatch.telefon;
+          c.dueDate = dMatch.qaytarish_sanasi;
+          c.isOverdue = dMatch.muddati_otgan;
+        } else {
+          c.debt = Math.max(0, c.nasiya_given - c.nasiya_returned);
+        }
+      });
+
+      return map;
+    }
+
+    // Render Transactions List
+    function renderTransactions() {
+      const container = document.getElementById('transactions-container');
+      const query = (document.getElementById('search-input').value || '').toLowerCase();
+      const typeFilter = document.getElementById('type-filter').value;
+
+      let list = [...(globalData.transactions || [])].reverse();
+
+      // Filters
+      if (typeFilter !== 'ALL') {
+        list = list.filter(item => {
+          if (typeFilter === 'Nasiya') return item.turi.includes('Nasiya') || item.turi.includes('qarz');
+          return item.turi.toLowerCase().includes(typeFilter.toLowerCase());
+        });
+      }
+
+      if (query) {
+        list = list.filter(item => 
+          (item.shaxs || '').toLowerCase().includes(query) ||
+          (item.izoh || '').toLowerCase().includes(query) ||
+          (item.kategoriya || '').toLowerCase().includes(query)
+        );
+      }
+
+      if (!list.length) {
+        container.innerHTML = `
+          <div class="text-center py-12 bg-white rounded-2xl border border-slate-100 p-6">
+            <i data-lucide="inbox" class="w-8 h-8 text-slate-300 mx-auto mb-2"></i>
+            <p class="text-xs text-slate-400 font-medium">Hech qanday ma'lumot topilmadi</p>
+          </div>
+        `;
+        lucide.createIcons();
+        return;
+      }
+
+      container.innerHTML = list.map(item => {
+        const isIncome = item.turi.toLowerCase().includes('tushum');
+        const isExpense = item.turi.toLowerCase().includes('xarajat');
+        const isDebtGiven = item.turi.toLowerCase().includes('berildi') || (item.turi.toLowerCase().includes('nasiya') && !item.turi.toLowerCase().includes('qaytdi'));
+        const isDebtReturned = item.turi.toLowerCase().includes('qaytdi');
+
+        let badgeBg = 'bg-slate-100 text-slate-600';
+        let amountColor = 'text-slate-800';
+        let iconName = 'arrow-down-left';
+
+        let amount = item.tushum || item.xarajat || item.nasiya || 0;
+
+        if (isIncome) {
+          badgeBg = 'bg-emerald-50 text-emerald-700 border border-emerald-200';
+          amountColor = 'text-emerald-600';
+          iconName = 'trending-up';
+        } else if (isExpense) {
+          badgeBg = 'bg-rose-50 text-rose-700 border border-rose-200';
+          amountColor = 'text-rose-600';
+          iconName = 'trending-down';
+        } else if (isDebtGiven) {
+          badgeBg = 'bg-amber-50 text-amber-700 border border-amber-200';
+          amountColor = 'text-amber-600';
+          iconName = 'clock';
+        } else if (isDebtReturned) {
+          badgeBg = 'bg-teal-50 text-teal-700 border border-teal-200';
+          amountColor = 'text-teal-600';
+          iconName = 'check-circle-2';
+        }
+
+        const clientNameSafe = escapeHtml(item.shaxs || "Noma'lum");
+
+        return `
+          <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-3 transition-all hover:border-slate-200">
+            <div class="flex items-start justify-between">
+              <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-xl ${badgeBg} flex items-center justify-center shrink-0">
+                  <i data-lucide="${iconName}" class="w-4 h-4"></i>
+                </div>
+                <div>
+                  <button onclick="openClientModal('${clientNameSafe}')" class="text-xs font-bold text-slate-800 hover:text-blue-600 transition-colors flex items-center space-x-1">
+                    <span>${clientNameSafe}</span>
+                    <i data-lucide="chevron-right" class="w-3 h-3 text-slate-400"></i>
+                  </button>
+                  <div class="flex items-center space-x-2 text-[10px] text-slate-400 mt-0.5">
+                    <span>${item.sana}</span>
+                    <span>•</span>
+                    <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">${item.kategoriya || "Boshqa"}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="text-right">
+                <div class="text-xs font-extrabold ${amountColor}">${(amount).toLocaleString()} so'm</div>
+                <div class="text-[10px] text-slate-400 font-medium">${item.turi}</div>
+              </div>
+            </div>
+
+            ${(item.izoh || item.telefon || item.qaytarish_sanasi) ? `
+              <div class="bg-slate-50 rounded-xl p-2.5 text-[11px] text-slate-600 space-y-1">
+                ${item.izoh ? `<div><span class="text-slate-400">Izoh:</span> ${escapeHtml(item.izoh)}</div>` : ''}
+                ${item.telefon ? `<div><span class="text-slate-400">Tel:</span> <a href="tel:${item.telefon}" class="text-blue-600 font-semibold">${item.telefon}</a></div>` : ''}
+                ${item.qaytarish_sanasi ? `<div><span class="text-amber-600 font-bold">⏰ Qaytarish:</span> <span class="font-bold text-slate-700">${item.qaytarish_sanasi}</span></div>` : ''}
+              </div>
+            ` : ''}
+
+            <div class="flex items-center justify-end space-x-2 pt-1 border-t border-slate-50">
+              <button onclick="openModal('edit', ${item.id})" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[11px] font-bold flex items-center space-x-1 transition-all">
+                <i data-lucide="edit-3" class="w-3 h-3"></i>
+                <span>Tahrirlash</span>
+              </button>
+              <button onclick="deleteRecord(${item.id})" class="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-[11px] font-bold flex items-center space-x-1 transition-all">
+                <i data-lucide="trash-2" class="w-3 h-3"></i>
+                <span>O'chirish</span>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    // Render Debts Tab
+    function renderDebts() {
+      const container = document.getElementById('debts-container');
+      const debts = globalData.debts || [];
+
+      if (!debts.length) {
+        container.innerHTML = `
+          <div class="text-center py-12 bg-white rounded-2xl border border-slate-100 p-6">
+            <i data-lucide="shield-check" class="w-8 h-8 text-emerald-400 mx-auto mb-2"></i>
+            <p class="text-xs text-slate-500 font-bold">Hozirda hech qanday faol qarzlar yo'q!</p>
+            <p class="text-[11px] text-slate-400 mt-1">Barcha qarzlar to'liq qaytarilgan.</p>
+          </div>
+        `;
+        lucide.createIcons();
+        return;
+      }
+
+      container.innerHTML = debts.map(d => {
+        const isOverdue = d.muddati_otgan;
+        const statusBg = isOverdue ? 'bg-rose-50 border-rose-200 text-rose-800' : 'bg-white border-slate-100 text-slate-800';
+        const clientNameSafe = escapeHtml(d.shaxs);
+
+        return `
+          <div class="rounded-2xl p-4 shadow-sm border ${statusBg} space-y-3">
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="flex items-center space-x-1.5">
+                  <button onclick="openClientModal('${clientNameSafe}')" class="text-xs font-bold text-slate-900 hover:text-blue-600 transition-colors flex items-center space-x-1">
+                    <span>${clientNameSafe}</span>
+                    <i data-lucide="user" class="w-3 h-3 text-slate-400"></i>
+                  </button>
+                  ${isOverdue ? `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-600 text-white">Muddati o'tdi</span>` : ''}
+                </div>
+                ${d.telefon ? `<div class="text-[11px] text-blue-600 font-semibold mt-0.5"><a href="tel:${d.telefon}">📞 ${d.telefon}</a></div>` : ''}
+              </div>
+              <div class="text-right">
+                <div class="text-xs font-black text-rose-600">${(d.qoldiq || 0).toLocaleString()} so'm</div>
+                <div class="text-[10px] text-slate-400">qoldiq qarz</div>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 text-[10px] bg-slate-50 rounded-xl p-2.5">
+              <div><span class="text-slate-400">Olingan sana:</span> <span class="font-bold text-slate-700">${d.berilgan_sana || '-'}</span></div>
+              <div><span class="text-slate-400">Qaytarish:</span> <span class="font-bold ${isOverdue ? 'text-rose-600' : 'text-slate-700'}">${d.qaytarish_sanasi || '-'}</span></div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 pt-1">
+              <!-- Telegram orqali yuborish -->
+              <a href="https://t.me/share/url?url=${encodeURIComponent(`Assalomu alaykum ${d.shaxs}, ${d.qoldiq?.toLocaleString()} so'm qarzni qaytarish muddati: ${d.qaytarish_sanasi || "bugun"}. Iltimos, imkon qadar tezroq yopishingizni so'raymiz.`)}" target="_blank" class="py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-center text-xs font-bold flex items-center justify-center space-x-1.5 shadow-sm active:scale-95 transition-all">
+                <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                <span>Telegramdan</span>
+              </a>
+
+              <!-- Telefon SMS orqali yuborish -->
+              <a href="sms:${d.telefon ? d.telefon.replace(/[^0-9+]/g, '') : ''}?body=${encodeURIComponent(`Assalomu alaykum ${d.shaxs}, ${d.qoldiq?.toLocaleString()} so'm qarzni qaytarish muddati: ${d.qaytarish_sanasi || "bugun"}. Iltimos, yopishingizni so'raymiz.`)}" class="py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-center text-xs font-bold flex items-center justify-center space-x-1.5 shadow-sm active:scale-95 transition-all">
+                <i data-lucide="message-square" class="w-3.5 h-3.5"></i>
+                <span>SMS orqali</span>
+              </a>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    // Render TAB 3: Mijozlar Bazasi (Mini-CRM)
+    function renderClients() {
+      const container = document.getElementById('clients-container');
+      const search = (document.getElementById('client-search-input')?.value || '').toLowerCase();
+      const filter = document.getElementById('client-filter')?.value || 'ALL';
+
+      const clientMap = calculateClientsMap();
+      let list = Object.values(clientMap);
+
+      // Total stats update
+      const totalTurnover = list.reduce((acc, c) => acc + c.turnover, 0);
+      const debtorsCount = list.filter(c => c.debt > 0).length;
+
+      document.getElementById('stat-client-total').textContent = list.length;
+      document.getElementById('stat-client-debtors').textContent = debtorsCount;
+      document.getElementById('stat-client-turnover').textContent = `${totalTurnover.toLocaleString()} so'm`;
+
+      // Filter
+      if (filter === 'DEBTORS') {
+        list = list.filter(c => c.debt > 0);
+      } else if (filter === 'CLEAN') {
+        list = list.filter(c => c.debt === 0);
+      }
+
+      if (search) {
+        list = list.filter(c => 
+          c.name.toLowerCase().includes(search) || 
+          (c.phone && c.phone.toLowerCase().includes(search))
+        );
+      }
+
+      // Sort by debt desc, then turnover desc
+      list.sort((a, b) => b.debt - a.debt || b.turnover - a.turnover);
+
+      if (!list.length) {
+        container.innerHTML = `
+          <div class="text-center py-12 bg-white rounded-2xl border border-slate-100 p-6">
+            <i data-lucide="users" class="w-8 h-8 text-slate-300 mx-auto mb-2"></i>
+            <p class="text-xs text-slate-400 font-medium">Mijozlar topilmadi</p>
+          </div>
+        `;
+        lucide.createIcons();
+        return;
+      }
+
+      container.innerHTML = list.map(c => {
+        const hasDebt = c.debt > 0;
+        const initial = (c.name.charAt(0) || "M").toUpperCase();
+        const clientNameSafe = escapeHtml(c.name);
+
+        return `
+          <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-3 transition-all hover:border-slate-200">
+            <div class="flex items-start justify-between">
+              <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-2xl ${hasDebt ? 'bg-gradient-to-tr from-amber-500 to-rose-500' : 'bg-gradient-to-tr from-blue-500 to-indigo-600'} text-white font-black text-sm flex items-center justify-center shadow-sm shrink-0">
+                  ${initial}
+                </div>
+                <div>
+                  <h4 class="text-xs font-bold text-slate-900">${clientNameSafe}</h4>
+                  <div class="text-[11px] text-slate-400 mt-0.5">
+                    ${c.phone ? `<a href="tel:${c.phone}" class="text-blue-600 font-semibold hover:underline">${c.phone}</a>` : 'Telefon kiritilmagan'}
+                  </div>
+                </div>
+              </div>
+
+              <div class="text-right">
+                ${hasDebt ? `
+                  <div class="text-xs font-black text-rose-600">${c.debt.toLocaleString()} so'm</div>
+                  <div class="text-[9px] font-bold text-rose-500 uppercase tracking-tight">Qarz qoldig'i</div>
+                ` : `
+                  <div class="text-xs font-black text-emerald-600">Qarzi yo'q</div>
+                  <div class="text-[9px] text-slate-400">Balans toza</div>
+                `}
+              </div>
+            </div>
+
+            <!-- Mini details bar -->
+            <div class="grid grid-cols-2 gap-2 text-[10px] bg-slate-50 rounded-xl p-2.5">
+              <div><span class="text-slate-400">Jami Aylanma:</span> <span class="font-bold text-slate-800">${c.turnover.toLocaleString()} so'm</span></div>
+              <div><span class="text-slate-400">Operatsiyalar:</span> <span class="font-bold text-slate-800">${c.count} ta yozuv</span></div>
+            </div>
+
+            <!-- Action buttons -->
+            <div class="grid grid-cols-3 gap-2 pt-1 border-t border-slate-50">
+              ${c.phone ? `
+                <a href="tel:${c.phone}" class="py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-center text-[11px] font-bold flex items-center justify-center space-x-1 transition-all">
+                  <i data-lucide="phone" class="w-3 h-3 text-emerald-600"></i>
+                  <span>Qo'ng'iroq</span>
+                </a>
+                <a href="https://t.me/share/url?url=${encodeURIComponent(`Assalomu alaykum ${c.name}, sizning qarz balansingiz: ${c.debt.toLocaleString()} so'm.`)}" target="_blank" class="py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-center text-[11px] font-bold flex items-center justify-center space-x-1 transition-all">
+                  <i data-lucide="send" class="w-3 h-3"></i>
+                  <span>Telegram</span>
+                </a>
+              ` : `
+                <div class="col-span-2 text-[10px] text-slate-400 flex items-center justify-center">Raqam yo'q</div>
+              `}
+              <button onclick="openClientModal('${clientNameSafe}')" class="py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-center text-[11px] font-bold flex items-center justify-center space-x-1 transition-all">
+                <i data-lucide="user" class="w-3 h-3"></i>
+                <span>Kartochka</span>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    // Open Client Profile Modal (Mini-CRM)
+    function openClientModal(clientName) {
+      const clientMap = calculateClientsMap();
+      const c = clientMap[clientName] || {
+        name: clientName,
+        phone: "",
+        turnover: 0,
+        paid: 0,
+        debt: 0,
+        items: []
+      };
+
+      document.getElementById('client-modal').classList.remove('hidden');
+      document.getElementById('client-modal-avatar').textContent = (c.name.charAt(0) || "M").toUpperCase();
+      document.getElementById('client-modal-name').textContent = c.name;
+      document.getElementById('client-modal-phone').textContent = c.phone ? `📞 ${c.phone}` : "Telefon kiritilmagan";
+
+      document.getElementById('client-modal-turnover').textContent = `${(c.turnover || 0).toLocaleString()} so'm`;
+      document.getElementById('client-modal-paid').textContent = `${(c.paid || 0).toLocaleString()} so'm`;
+      document.getElementById('client-modal-debt').textContent = `${(c.debt || 0).toLocaleString()} so'm`;
+
+      // Contact action buttons
+      const actionsEl = document.getElementById('client-modal-contact-actions');
+      if (c.phone) {
+        const cleanPhone = c.phone.replace(/[^0-9+]/g, '');
+        actionsEl.innerHTML = `
+          <a href="tel:${cleanPhone}" class="py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-center text-xs font-bold flex items-center justify-center space-x-1 transition-all">
+            <i data-lucide="phone" class="w-3.5 h-3.5 text-emerald-600"></i>
+            <span>Qo'ng'iroq</span>
+          </a>
+          <a href="https://t.me/share/url?url=${encodeURIComponent(`Assalomu alaykum ${c.name}, hisob-kitobingiz bo'yicha qoldiq: ${c.debt.toLocaleString()} so'm.`)}" target="_blank" class="py-2 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded-xl text-center text-xs font-bold flex items-center justify-center space-x-1 transition-all">
+            <i data-lucide="send" class="w-3.5 h-3.5 text-blue-600"></i>
+            <span>Telegram</span>
+          </a>
+          <a href="sms:${cleanPhone}?body=${encodeURIComponent(`Assalomu alaykum ${c.name}, hisob-kitobingiz bo'yicha qoldiq: ${c.debt.toLocaleString()} so'm.`)}" class="py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-center text-xs font-bold flex items-center justify-center space-x-1 transition-all">
+            <i data-lucide="message-square" class="w-3.5 h-3.5"></i>
+            <span>SMS</span>
+          </a>
+        `;
+      } else {
+        actionsEl.innerHTML = `<div class="col-span-3 text-center text-xs text-slate-400 py-1">Telefon raqam mavjud emas</div>`;
+      }
+
+      // History list
+      const historyEl = document.getElementById('client-modal-history');
+      const items = [...(c.items || [])].reverse();
+      document.getElementById('client-modal-count').textContent = `${items.length} ta operatsiya`;
+
+      if (!items.length) {
+        historyEl.innerHTML = `<div class="text-center py-6 text-slate-400 text-xs">Ushbu mijoz bo'yicha operatsiyalar yo'q</div>`;
+      } else {
+        historyEl.innerHTML = items.map(item => {
+          const sum = item.tushum || item.xarajat || item.nasiya || 0;
+          let badgeColor = 'text-slate-800';
+          if (item.turi.includes('Tushum')) badgeColor = 'text-emerald-600';
+          else if (item.turi.includes('Xarajat')) badgeColor = 'text-rose-600';
+          else if (item.turi.includes('Nasiya')) badgeColor = 'text-amber-600';
+
+          return `
+            <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-100 flex items-center justify-between text-xs">
+              <div>
+                <div class="font-bold text-slate-800">${item.turi}</div>
+                <div class="text-[10px] text-slate-400">${item.sana} ${item.vaqt ? `• ${item.vaqt}` : ''}</div>
+                ${item.izoh ? `<div class="text-[10px] text-slate-600 mt-0.5">${escapeHtml(item.izoh)}</div>` : ''}
+              </div>
+              <div class="text-right">
+                <div class="font-black ${badgeColor}">${sum.toLocaleString()} so'm</div>
+                <div class="text-[10px] text-slate-400">${item.kategoriya || "Boshqa"}</div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      lucide.createIcons();
+    }
+
+    function closeClientModal() {
+      document.getElementById('client-modal').classList.add('hidden');
+    }
+
+    function clientQuickAction(type) {
+      const currentClientName = document.getElementById('client-modal-name').textContent;
+      const currentClientPhone = document.getElementById('client-modal-phone').textContent.replace('📞 ', '').trim();
+      closeClientModal();
+
+      openModal('add');
+      document.getElementById('form-shaxs').value = currentClientName;
+      if (currentClientPhone && currentClientPhone !== "Telefon kiritilmagan") {
+        document.getElementById('form-telefon').value = currentClientPhone;
+      }
+
+      const radios = document.getElementsByName('form-turi');
+      if (type === 'debt') {
+        radios.forEach(r => { if (r.value === 'Nasiya berildi') r.checked = true; });
+      } else if (type === 'payment') {
+        radios.forEach(r => { if (r.value === 'Nasiya qaytdi') r.checked = true; });
+      }
+      toggleFormFields();
+    }
+
+    // Direct Browser Excel Export (Feature 7)
+    function exportToExcel() {
+      if (typeof XLSX === 'undefined') {
+        alert("Excel moduli yuklanmadi, sahifani yangilang.");
+        return;
+      }
+
+      const wb = XLSX.utils.book_new();
+
+      // 1. Transactions Sheet
+      const txRows = [
+        ["ID", "Sana", "Vaqt", "Turi", "Shaxs / Mijoz", "Telefon", "Tushum (so'm)", "Xarajat (so'm)", "Nasiya (so'm)", "Qaytarish Sanasi", "Kategoriya", "Izoh"]
+      ];
+      (globalData.transactions || []).forEach(t => {
+        txRows.push([
+          t.id,
+          t.sana,
+          t.vaqt,
+          t.turi,
+          t.shaxs,
+          t.telefon || "",
+          t.tushum || 0,
+          t.xarajat || 0,
+          t.nasiya || 0,
+          t.qaytarish_sanasi || "",
+          t.kategoriya || "Boshqa",
+          t.izoh || ""
+        ]);
+      });
+      const wsTx = XLSX.utils.aoa_to_sheet(txRows);
+      XLSX.utils.book_append_sheet(wb, wsTx, "Barcha Yozuvlar");
+
+      // 2. Debts Sheet
+      const debtRows = [
+        ["Mijoz / Shaxs", "Telefon", "Qoldiq Qarz (so'm)", "Berilgan Sana", "Qaytarish Sanasi", "Muddati O'tganmi?"]
+      ];
+      (globalData.debts || []).forEach(d => {
+        debtRows.push([
+          d.shaxs,
+          d.telefon || "",
+          d.qoldiq || 0,
+          d.berilgan_sana || "",
+          d.qaytarish_sanasi || "",
+          d.muddati_otgan ? "Ha (Muddati o'tgan)" : "Yo'q (Faol)"
+        ]);
+      });
+      const wsDebt = XLSX.utils.aoa_to_sheet(debtRows);
+      XLSX.utils.book_append_sheet(wb, wsDebt, "Qarzdorlar");
+
+      // 3. Clients Sheet (Mini-CRM)
+      const clientMap = calculateClientsMap();
+      const clientRows = [
+        ["Mijoz Ismi", "Telefon", "Jami Aylanma (so'm)", "Jami To'langan (so'm)", "Qarz Qoldig'i (so'm)", "Operatsiyalar Soni", "Oxirgi Operatsiya"]
+      ];
+      Object.values(clientMap).forEach(c => {
+        clientRows.push([
+          c.name,
+          c.phone || "",
+          c.turnover,
+          c.paid,
+          c.debt,
+          c.count,
+          c.lastDate
+        ]);
+      });
+      const wsClients = XLSX.utils.aoa_to_sheet(clientRows);
+      XLSX.utils.book_append_sheet(wb, wsClients, "Mijozlar Bazasi (CRM)");
+
+      const todayStr = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, `Moliya_Hisobot_${todayStr}.xlsx`);
+      
+      if (window.Telegram?.WebApp?.showPopup) {
+        window.Telegram.WebApp.showPopup({
+          title: "Muvaffaqiyatli!",
+          message: `Moliya_Hisobot_${todayStr}.xlsx fayli yuklab olindi.`,
+          buttons: [{ type: "ok" }]
+        });
+      } else {
+        alert(`Excel hisobot (Moliya_Hisobot_${todayStr}.xlsx) muvaffaqiyatli yuklab olindi!`);
+      }
+    }
+
+    // Render Analytics & Charts
+    function renderAnalytics() {
+      const cats = globalData.summary?.kategoriya_xarajatlar || {};
+      const labels = Object.keys(cats);
+      const data = Object.values(cats);
+
+      // Render Table
+      const summaryList = document.getElementById('category-summary-list');
+      if (!labels.length) {
+        summaryList.innerHTML = `<div class="p-4 text-center text-slate-400 text-xs">Xarajatlar mavjud emas</div>`;
+      } else {
+        summaryList.innerHTML = labels.map(c => `
+          <div class="p-3.5 flex items-center justify-between">
+            <span class="font-medium text-slate-700">${escapeHtml(c)}</span>
+            <span class="font-bold text-rose-600">${(cats[c]).toLocaleString()} so'm</span>
+          </div>
+        `).join('');
+      }
+
+      // Render Chart
+      const ctx = document.getElementById('categoryChart')?.getContext('2d');
+      if (!ctx) return;
+
+      if (chartInstance) {
+        chartInstance.destroy();
+      }
+
+      if (!labels.length) return;
+
+      chartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: data,
+            backgroundColor: [
+              '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'
+            ],
+            borderWidth: 2,
+            borderColor: '#ffffff'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: {
+                boxWidth: 10,
+                font: { size: 10 }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // Modal Control
+    function openModal(mode, id = null) {
+      document.getElementById('modal').classList.remove('hidden');
+      document.getElementById('record-form').reset();
+      document.getElementById('form-id').value = '';
+
+      if (mode === 'edit' && id) {
+        const item = (globalData.transactions || []).find(x => x.id === id);
+        if (item) {
+          document.getElementById('modal-title').textContent = "Yozuvni Tahrirlash";
+          document.getElementById('form-id').value = item.id;
+          
+          const sum = item.tushum || item.xarajat || item.nasiya || 0;
+          document.getElementById('form-summa').value = sum;
+          document.getElementById('form-shaxs').value = item.shaxs || '';
+          document.getElementById('form-telefon').value = item.telefon || '';
+          document.getElementById('form-due-date').value = item.qaytarish_sanasi || '';
+          document.getElementById('form-kategoriya').value = item.kategoriya || 'Boshqa';
+          document.getElementById('form-izoh').value = item.izoh || '';
+
+          const radios = document.getElementsByName('form-turi');
+          radios.forEach(r => {
+            if (r.value.toLowerCase() === (item.turi || '').toLowerCase()) {
+              r.checked = true;
+            }
+          });
+        }
+      } else {
+        document.getElementById('modal-title').textContent = "Yangi Yozuv Qo'shish";
+      }
+
+      toggleFormFields();
+      lucide.createIcons();
+    }
+
+    function closeModal() {
+      document.getElementById('modal').classList.add('hidden');
+    }
+
+    function toggleFormFields() {
+      const selectedTuri = document.querySelector('input[name="form-turi"]:checked')?.value || 'Tushum';
+      const dueContainer = document.getElementById('due-date-container');
+      if (selectedTuri.includes('Nasiya') || selectedTuri.includes('Qarz')) {
+        dueContainer.classList.remove('hidden');
+      } else {
+        dueContainer.classList.add('hidden');
+      }
+    }
+
+    // Submit Form
+    async function handleFormSubmit(e) {
+      e.preventDefault();
+      const id = document.getElementById('form-id').value;
+      const turi = document.querySelector('input[name="form-turi"]:checked')?.value;
+      const summa = parseInt(document.getElementById('form-summa').value || '0');
+      const shaxs = document.getElementById('form-shaxs').value.trim() || "Noma'lum";
+      const telefon = document.getElementById('form-telefon').value.trim();
+      const qaytarish_sanasi = document.getElementById('form-due-date').value;
+      const kategoriya = document.getElementById('form-kategoriya').value;
+      const izoh = document.getElementById('form-izoh').value.trim();
+
+      const payload = {
+        id: id ? parseInt(id) : null,
+        turi: turi,
+        shaxs: shaxs,
+        telefon: telefon,
+        tushum_som: turi === 'Tushum' ? summa : 0,
+        xarajat_som: turi === 'Xarajat' ? summa : 0,
+        nasiya_som: (turi.includes('Nasiya') || turi.includes('Qarz')) ? summa : 0,
+        qaytarish_sanasi: qaytarish_sanasi || null,
+        kategoriya: kategoriya,
+        izoh: izoh
+      };
+
+      try {
+        const resp = await fetch('/api/record', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!resp.ok) throw new Error('Saqlashda xato');
+        closeModal();
+        await refreshData();
+      } catch (err) {
+        alert("Xatolik yuz berdi: " + err.message);
+      }
+    }
+
+    // Delete Record
+    async function deleteRecord(id) {
+      if (!confirm(`${id}-raqamli yozuvni o'chirishni tasdiqlaysizmi?`)) return;
+
+      try {
+        const resp = await fetch(`/api/record/${id}`, { method: 'DELETE' });
+        if (!resp.ok) throw new Error("O'chirishda xatolik");
+        await refreshData();
+      } catch (err) {
+        alert("Xatolik: " + err.message);
+      }
+    }
+
+    function escapeHtml(text) {
+      return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    // Initial Load
+    refreshData();
+  </script>
+</body>
+</html>
