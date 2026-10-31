@@ -2463,6 +2463,16 @@ def main():
 
         asyncio.run(start_webhook())
     else:
+        import urllib.request, json
+        try:
+            wh_res = json.loads(urllib.request.urlopen(f"https://api.telegram.org/bot{BOT_TOKEN}/getWebhookInfo").read())
+            active_wh = wh_res.get("result", {}).get("url", "")
+            if active_wh and "onrender.com" in active_wh:
+                logger.info(f"🌐 Bot hozirda 24/7 Cloud Serverda ({active_wh}) faol ishlamoqda. Local polling shart emas!")
+                return
+        except Exception as wh_chk_err:
+            logger.debug(f"Webhook check: {wh_chk_err}")
+
         logger.info("✅ Bot tayyor (Local Polling)!")
         async def on_startup(application):
             asyncio.create_task(check_debt_reminders_task(application))
