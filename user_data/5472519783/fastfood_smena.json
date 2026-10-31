@@ -1,0 +1,77 @@
+[
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-30",
+    "hodimlar": [
+      {
+        "ism": "Nurbik",
+        "lavozim": "bo'sh",
+        "soat": null,
+        "ish_haqi": 8100
+      },
+      {
+        "ism": "Nodera",
+        "lavozim": "bo'sh",
+        "soat": null,
+        "ish_haqi": 500
+      },
+      {
+        "ism": "Jorabik",
+        "lavozim": "bo'sh",
+        "soat": null,
+        "ish_haqi": 500
+      },
+      {
+        "ism": "Rabia",
+        "lavozim": "bo'sh",
+        "soat": null,
+        "ish_haqi": 6000
+      }
+    ],
+    "jami_ish_haqi": 15100,
+    "kassa_topshirildi_sdano": null,
+    "kartadan_yechildi": null,
+    "karta_avans_va_xarajatlar": [],
+    "izoh": "30‑oktabr kuni smenada Nurbik 8 100 soʻm, Nodera 500 soʻm, Jorabik 500 soʻm va Rabia 6 000 soʻm olgan. Rahat ismi keltirilgan, lekin maosh ko‘rsatilmagan.",
+    "toza_matn": "30‑oktabr, Nurbik 8 100, Nodera 500, Rahat, Jorabik 500, Rabia 6 000.",
+    "vaqt": "17:10"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-30",
+    "hodimlar": [
+      {
+        "ism": "Nurbek",
+        "lavozim": "bo'sh",
+        "soat": null,
+        "ish_haqi": 8100
+      }
+    ],
+    "jami_ish_haqi": 8100,
+    "kassa_topshirildi_sdano": 0,
+    "kartadan_yechildi": 0,
+    "karta_avans_va_xarajatlar": [],
+    "izoh": "Smena ma'lumoti: Nurbek 8100 so'm",
+    "toza_matn": "Nurbek 8100",
+    "vaqt": "17:26"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-29",
+    "hodimlar": [
+      {
+        "ism": "Nurbek",
+        "lavozim": "",
+        "soat": null,
+        "ish_haqi": 8500
+      }
+    ],
+    "jami_ish_haqi": 8500,
+    "kassa_topshirildi_sdano": null,
+    "kartadan_yechildi": null,
+    "karta_avans_va_xarajatlar": [],
+    "izoh": "Nurbek uchun ish haqi",
+    "toza_matn": "29.10.2026 Nurbek 8500",
+    "vaqt": "17:34"
+  }
+]

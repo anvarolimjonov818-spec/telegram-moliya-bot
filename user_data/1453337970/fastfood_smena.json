@@ -979,25 +979,6 @@
   },
   {
     "is_fastfood_smena": true,
-    "sana": "2026-10-30",
-    "vaqt": "22:00",
-    "hodimlar": [],
-    "jami_ish_haqi": 0,
-    "kassa_topshirildi_sdano": 0,
-    "kartadan_yechildi": 0,
-    "karta_avans_va_xarajatlar": [
-      {
-        "shaxs": "Малиш",
-        "turi": "xarajat",
-        "summa": 15000,
-        "izoh": "Малиш / сервис"
-      }
-    ],
-    "savdo_viruchka": 0,
-    "izoh": "Малиш"
-  },
-  {
-    "is_fastfood_smena": true,
     "sana": "2026-10-31",
     "vaqt": "22:00",
     "hodimlar": [],
@@ -1014,24 +995,5 @@
     ],
     "savdo_viruchka": 0,
     "izoh": "Шина 983"
-  },
-  {
-    "is_fastfood_smena": true,
-    "sana": "2026-10-30",
-    "hodimlar": [
-      {
-        "ism": "Nurbek",
-        "lavozim": "bo'sh",
-        "soat": null,
-        "ish_haqi": 7200
-      }
-    ],
-    "jami_ish_haqi": 7200,
-    "kassa_topshirildi_sdano": 0,
-    "kartadan_yechildi": 0,
-    "karta_avans_va_xarajatlar": [],
-    "izoh": "Nurbekga bir kunlik ish haqi 7200 so'm hisoblandi.",
-    "toza_matn": "Nurbekga bir kunlik ish haqi 7200 so'm belgilandi.",
-    "vaqt": "21:04"
   }
 ]

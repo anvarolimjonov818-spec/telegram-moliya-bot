@@ -2251,7 +2251,7 @@ async def run_server_webhook(app, port: int, external_url: str):
     webhook_url = f"{external_url}/telegram"
     logger.info(f"🌐 Setting Telegram Webhook to: {webhook_url}")
     try:
-        await app.bot.set_webhook(url=webhook_url, drop_pending_updates=True)
+        await app.bot.set_webhook(url=webhook_url, drop_pending_updates=False)
         logger.info("✅ Telegram Webhook successfully set with Telegram API!")
     except Exception as w_err:
         logger.error(f"Failed to set webhook: {w_err}")
@@ -2469,7 +2469,7 @@ def main():
             asyncio.create_task(daily_digest_scheduler_task(application))
 
         app.post_init = on_startup
-        app.run_polling(drop_pending_updates=True)
+        app.run_polling(drop_pending_updates=False)
 
 if __name__ == "__main__":
     main()
