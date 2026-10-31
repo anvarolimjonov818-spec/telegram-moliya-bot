@@ -31,7 +31,14 @@ from telegram.ext import (
 )
 from telegram.constants import ChatAction
 
-from config import BOT_TOKEN, GEMINI_API_KEY, GROQ_API_KEY
+try:
+    from config import BOT_TOKEN as CFG_BOT_TOKEN, GEMINI_API_KEY as CFG_GEMINI_KEY, GROQ_API_KEY as CFG_GROQ_KEY
+except ImportError:
+    CFG_BOT_TOKEN, CFG_GEMINI_KEY, CFG_GROQ_KEY = "", "", ""
+
+BOT_TOKEN = os.environ.get("BOT_TOKEN", CFG_BOT_TOKEN).strip()
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", CFG_GEMINI_KEY).strip()
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", CFG_GROQ_KEY).strip()
 
 logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(message)s",
@@ -42,6 +49,76 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+DEFAULT_USER_ID = 1453337970
+USER_DATA_DIR = os.path.join(os.path.dirname(__file__), "user_data")
+os.makedirs(USER_DATA_DIR, exist_ok=True)
+
+HEADERS = [
+    "Sana", "Vaqt", "Turi", "Shaxs / Mijoz", "Telefon",
+    "Tushum (so'm)", "Xarajat (so'm)", "Nasiya (so'm)",
+    "Qaytarish Sanasi", "Kategoriya", "Izoh / Tafsilotlar"
+]
+
+COLUMN_WIDTHS = {
+    "A": 13, "B": 8, "C": 15, "D": 18, "E": 16,
+    "F": 17, "G": 17, "H": 17, "I": 16, "J": 18,
+    "K": 38, "L": 5, "M": 26, "N": 17, "O": 17, "P": 17
+}
+
+MONTH_NAMES_UZ = {
+    "01": "Yanvar", "02": "Fevral", "03": "Mart", "04": "Aprel",
+    "05": "May", "06": "Iyun", "07": "Iyul", "08": "Avgust",
+    "09": "Sentabr", "10": "Oktabr", "11": "Noyabr", "12": "Dekabr"
+}
+
+def get_user_paths(user_id=None):
+    uid = str(user_id or DEFAULT_USER_ID).strip()
+    u_dir = os.path.join(USER_DATA_DIR, uid)
+    os.makedirs(u_dir, exist_ok=True)
+
+    csv_path = os.path.join(u_dir, "Mening_Moliya_Jadvalim.csv")
+    excel_path = os.path.join(u_dir, "Mening_Moliya_Jadvalim.xlsx")
+    debts_path = os.path.join(u_dir, "qarz_eslatmalari.json")
+    fastfood_path = os.path.join(u_dir, "fastfood_smena.json")
+
+    # Boshlang'ich foydalanuvchi ma'lumotlarini saqlash
+    if uid == str(DEFAULT_USER_ID):
+        root_csv = os.path.join(os.path.dirname(__file__), "Mening_Moliya_Jadvalim.csv")
+        root_excel = os.path.join(os.path.dirname(__file__), "Mening_Moliya_Jadvalim.xlsx")
+        root_debts = os.path.join(os.path.dirname(__file__), "qarz_eslatmalari.json")
+
+        if os.path.exists(root_csv) and not os.path.exists(csv_path):
+            import shutil
+            shutil.copy2(root_csv, csv_path)
+        if os.path.exists(root_excel) and not os.path.exists(excel_path):
+            import shutil
+            shutil.copy2(root_excel, excel_path)
+        if os.path.exists(root_debts) and not os.path.exists(debts_path):
+            import shutil
+            shutil.copy2(root_debts, debts_path)
+
+    # Yangi foydalanuvchi uchun toza alohida shablonlar
+    if not os.path.exists(csv_path):
+        with open(csv_path, mode='w', newline='', encoding='utf-8-sig') as f:
+            writer = csv.writer(f, delimiter=';')
+            writer.writerow(HEADERS)
+    if not os.path.exists(excel_path):
+        create_styled_excel(excel_path)
+    if not os.path.exists(debts_path):
+        with open(debts_path, "w", encoding="utf-8") as f:
+            json.dump([], f)
+    if not os.path.exists(fastfood_path):
+        with open(fastfood_path, "w", encoding="utf-8") as f:
+            json.dump([], f)
+
+    return {
+        "user_id": uid,
+        "csv": csv_path,
+        "excel": excel_path,
+        "debts": debts_path,
+        "fastfood": fastfood_path
+    }
 
 DEBT_REMINDERS_FILE = "qarz_eslatmalari.json"
 SUBSCRIBERS_FILE = "bot_subscribers.json"
@@ -58,7 +135,7 @@ def add_subscriber(chat_id: int):
                     subs.add(int(s))
         except:
             pass
-    for r in load_debt_reminders():
+    for r in load_debt_reminders(chat_id):
         c = r.get("chat_id")
         if c:
             subs.add(int(c))
@@ -79,32 +156,35 @@ def get_all_subscribers() -> list:
                     subs.add(int(s))
         except:
             pass
-    for r in load_debt_reminders():
-        c = r.get("chat_id")
-        if c:
-            subs.add(int(c))
+    if os.path.exists(USER_DATA_DIR):
+        for uid in os.listdir(USER_DATA_DIR):
+            if uid.isdigit():
+                subs.add(int(uid))
     return list(subs)
 
-def load_debt_reminders() -> list:
-    if os.path.exists(DEBT_REMINDERS_FILE):
+def load_debt_reminders(user_id=None) -> list:
+    paths = get_user_paths(user_id)
+    if os.path.exists(paths["debts"]):
         try:
-            with open(DEBT_REMINDERS_FILE, "r", encoding="utf-8") as f:
+            with open(paths["debts"], "r", encoding="utf-8") as f:
                 return json.load(f)
         except:
             return []
     return []
 
-def save_debt_reminders(reminders: list):
-    with open(DEBT_REMINDERS_FILE, "w", encoding="utf-8") as f:
+def save_debt_reminders(reminders: list, user_id=None):
+    paths = get_user_paths(user_id)
+    with open(paths["debts"], "w", encoding="utf-8") as f:
         json.dump(reminders, f, ensure_ascii=False, indent=2)
 
-def calculate_person_debt_balance(person_name: str) -> dict:
+def calculate_person_debt_balance(person_name: str, user_id=None) -> dict:
     total_berildi = 0
     total_qaytdi = 0
     p_clean = (person_name or "").strip().lower()
+    paths = get_user_paths(user_id)
 
-    if os.path.exists(CSV_FILE_PATH):
-        with open(CSV_FILE_PATH, mode='r', encoding='utf-8-sig') as f:
+    if os.path.exists(paths["csv"]):
+        with open(paths["csv"], mode='r', encoding='utf-8-sig') as f:
             reader = csv.reader(f, delimiter=';')
             headers = next(reader, None)
             for row in reader:
@@ -116,7 +196,6 @@ def calculate_person_debt_balance(person_name: str) -> dict:
                 nasiya_s = int(row[6]) if str(row[6]).isdigit() else 0
                 tushum_s = int(row[4]) if str(row[4]).isdigit() else 0
 
-                # Agar shaxs ismi mos kelsa yoki izohda ismi qatnashgan bo'lsa
                 if p_clean in row_person or p_clean in row_izoh:
                     if "qaytdi" in row_turi or "qaytar" in row_izoh:
                         summa = nasiya_s if nasiya_s > 0 else tushum_s
@@ -131,6 +210,268 @@ def calculate_person_debt_balance(person_name: str) -> dict:
         "total_qaytdi": total_qaytdi,
         "qoldiq": max(0, qoldiq)
     }
+
+# ==================== FAST FOOD SMENA & TABEL MODULI ====================
+
+def load_fastfood_smenas(user_id=None) -> list:
+    paths = get_user_paths(user_id)
+    if os.path.exists(paths["fastfood"]):
+        try:
+            with open(paths["fastfood"], "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            return []
+    return []
+
+def save_fastfood_smenas(smenas: list, user_id=None):
+    paths = get_user_paths(user_id)
+    with open(paths["fastfood"], "w", encoding="utf-8") as f:
+        json.dump(smenas, f, ensure_ascii=False, indent=2)
+
+def append_fastfood_smena_to_excel(smena_data: dict, user_id=None):
+    paths = get_user_paths(user_id)
+    excel_path = paths["excel"]
+    if not os.path.exists(excel_path):
+        wb = create_styled_excel(excel_path)
+    else:
+        wb = openpyxl.load_workbook(excel_path)
+
+    sheet_title = "Fast Food Tabel"
+    if sheet_title not in wb.sheetnames:
+        ws = wb.create_sheet(sheet_title)
+        headers = [
+            "Sana", "Vaqt", "Xodimlar (Tafsilot)",
+            "Jami Ish Haqi (З/П)", "Topshirildi (Сдано)", "Kartadan Yechildi",
+            "Karta / Avanslar & Xarajatlar", "Izoh"
+        ]
+        ws.append(headers)
+        header_fill = PatternFill(start_color="1F2937", end_color="1F2937", fill_type="solid")
+        header_font = Font(name="Segoe UI", size=11, bold=True, color="FFFFFF")
+        for col_idx in range(1, len(headers) + 1):
+            cell = ws.cell(row=1, column=col_idx)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+        col_widths = {"A": 13, "B": 9, "C": 45, "D": 20, "E": 20, "F": 20, "G": 40, "H": 30}
+        for col_l, width in col_widths.items():
+            ws.column_dimensions[col_l].width = width
+    else:
+        ws = wb[sheet_title]
+
+    workers = smena_data.get("hodimlar", [])
+    w_strs = []
+    for w in workers:
+        ism = w.get("ism", "")
+        lavozim = f" ({w['lavozim']})" if w.get("lavozim") else ""
+        soat = f" [{w['soat']} soat]" if w.get("soat") else ""
+        haq = f": {int(w.get('ish_haqi', 0)):,}"
+        w_strs.append(f"{ism}{lavozim}{soat}{haq}")
+    w_details = "; ".join(w_strs)
+
+    card_items = smena_data.get("karta_avans_va_xarajatlar", [])
+    c_strs = []
+    for c in card_items:
+        c_strs.append(f"{c.get('shaxs', '')} {c.get('turi', '')} {int(c.get('summa', 0)):,} ({c.get('izoh', '')})")
+    c_details = "; ".join(c_strs)
+
+    row_data = [
+        smena_data.get("sana", ""),
+        smena_data.get("vaqt", ""),
+        w_details,
+        int(smena_data.get("jami_ish_haqi", 0)),
+        int(smena_data.get("kassa_topshirildi_sdano", 0)),
+        int(smena_data.get("kartadan_yechildi", 0)),
+        c_details,
+        smena_data.get("izoh", "")
+    ]
+    ws.append(row_data)
+
+    row_idx = ws.max_row
+    thin_border = Border(
+        left=Side(style='thin', color='CBD5E1'),
+        right=Side(style='thin', color='CBD5E1'),
+        top=Side(style='thin', color='CBD5E1'),
+        bottom=Side(style='thin', color='CBD5E1')
+    )
+    for col_idx in range(1, len(row_data) + 1):
+        cell = ws.cell(row=row_idx, column=col_idx)
+        cell.border = thin_border
+        cell.font = Font(name="Segoe UI", size=10)
+        if col_idx in (4, 5, 6):
+            cell.number_format = "#,##0"
+            cell.alignment = Alignment(horizontal="right")
+        else:
+            cell.alignment = Alignment(horizontal="left", vertical="center")
+
+    wb.save(excel_path)
+    try:
+        from tabel_sync import sync_fastfood_tabel_file
+        sync_fastfood_tabel_file(user_id)
+    except Exception as t_err:
+        logger.error(f"Tabel sync error: {t_err}")
+
+def calculate_fastfood_summary(user_id=None, month_prefix=None, start_day=1, end_day=31):
+    smenas = load_fastfood_smenas(user_id)
+    if not month_prefix:
+        month_prefix = datetime.datetime.now().strftime("%Y-%m")
+
+    filtered = []
+    for s in smenas:
+        s_date = s.get("sana", "")
+        if s_date.startswith(month_prefix):
+            try:
+                day = int(s_date.split("-")[2])
+                if start_day <= day <= end_day:
+                    filtered.append(s)
+            except:
+                filtered.append(s)
+
+    workers_map = {}
+    total_zp = 0
+    total_sdano = 0
+    total_karta_yechildi = 0
+    total_avans = 0
+    total_xarajat = 0
+
+    for s in filtered:
+        total_zp += int(s.get("jami_ish_haqi", 0))
+        total_sdano += int(s.get("kassa_topshirildi_sdano", 0))
+        total_karta_yechildi += int(s.get("kartadan_yechildi", 0))
+
+        for w in s.get("hodimlar", []):
+            name = (w.get("ism") or "Xodim").strip()
+            if name not in workers_map:
+                workers_map[name] = {
+                    "name": name,
+                    "total_ish_haqi": 0,
+                    "shifts_count": 0,
+                    "avanslar": 0,
+                    "soatlar": 0
+                }
+            workers_map[name]["total_ish_haqi"] += int(w.get("ish_haqi", 0))
+            workers_map[name]["shifts_count"] += 1
+            if w.get("soat"):
+                try:
+                    workers_map[name]["soatlar"] += float(w["soat"])
+                except:
+                    pass
+
+        for c in s.get("karta_avans_va_xarajatlar", []):
+            summa = int(c.get("summa", 0))
+            c_type = (c.get("turi") or "").lower()
+            target_shaxs = (c.get("shaxs") or "").strip()
+
+            if "avans" in c_type:
+                total_avans += summa
+                matched = False
+                for w_name in workers_map:
+                    if target_shaxs.lower() in w_name.lower() or w_name.lower() in target_shaxs.lower():
+                        workers_map[w_name]["avanslar"] += summa
+                        matched = True
+                        break
+                if not matched and target_shaxs:
+                    if target_shaxs not in workers_map:
+                        workers_map[target_shaxs] = {
+                            "name": target_shaxs,
+                            "total_ish_haqi": 0,
+                            "shifts_count": 0,
+                            "avanslar": summa,
+                            "soatlar": 0
+                        }
+                    else:
+                        workers_map[target_shaxs]["avanslar"] += summa
+            else:
+                total_xarajat += summa
+
+    for w in workers_map.values():
+        w["qoldiq_to_lanadi"] = w["total_ish_haqi"] - w["avanslar"]
+
+    return {
+        "filtered_smenas": filtered,
+        "workers": workers_map,
+        "total_zp": total_zp,
+        "total_sdano": total_sdano,
+        "total_karta_yechildi": total_karta_yechildi,
+        "total_avans": total_avans,
+        "total_xarajat": total_xarajat,
+        "month_prefix": month_prefix,
+        "start_day": start_day,
+        "end_day": end_day
+    }
+
+def format_fastfood_shift_message(data: dict) -> str:
+    sana = data.get("sana", datetime.datetime.now().strftime("%Y-%m-%d"))
+    text = f"🍔 **FAST FOOD KUNLIK SMENA HISOBOTI** 📋\n"
+    text += f"📅 **Sana:** `{sana}`\n"
+    text += f"━━━━━━━━━━━━━━━━━━━━━━\n\n"
+
+    workers = data.get("hodimlar", [])
+    if workers:
+        text += "👥 **XODIMLAR ISH HAQI (З/П):**\n"
+        for w in workers:
+            ism = w.get("ism", "Xodim")
+            lavozim = f" ({w['lavozim']})" if w.get("lavozim") else ""
+            soat = f" [{w['soat']} soat]" if w.get("soat") else ""
+            haq = int(w.get("ish_haqi", 0))
+            text += f"  • {ism}{lavozim}{soat}: `{haq:,}` so'm\n"
+        text += f"💰 **JAMI KUNLIK З/П:** `{int(data.get('jami_ish_haqi', 0)):,}` so'm\n\n"
+
+    sdano = int(data.get("kassa_topshirildi_sdano", 0))
+    kartadan = int(data.get("kartadan_yechildi", 0))
+    card_items = data.get("karta_avans_va_xarajatlar", [])
+
+    text += "🏦 **KASSA VA TO'LOVLAR:**\n"
+    text += f"💵 Kassa topshirildi (Сдано): `{sdano:,}` so'm\n"
+    text += f"💳 Kartadan yechildi: `{kartadan:,}` so'm\n"
+    if card_items:
+        text += f"\n💳 **KARTA / AVANSLAR VA XARAJATLAR:**\n"
+        for c in card_items:
+            text += f"  • {c.get('shaxs', '')}: `{int(c.get('summa', 0)):,}` so'm ({c.get('izoh', '')})\n"
+
+    text += f"\n✅ *Fast Food tabeliga va shaxsiy hisobingizga saqlandi!*"
+    return text
+
+def format_fastfood_tabel_report(summary: dict, title: str = "10 KUNLIK SMENA SARHISOBI") -> str:
+    workers = list(summary["workers"].values())
+    workers.sort(key=lambda x: x["total_ish_haqi"], reverse=True)
+
+    month_parts = summary["month_prefix"].split("-")
+    month_name = MONTH_NAMES_UZ.get(month_parts[1], "") if len(month_parts) > 1 else ""
+
+    text = f"🍔 **FAST FOOD TABEL: {title.upper()}** 📊\n"
+    text += f"📅 **Davr:** `{summary['start_day']}-{summary['end_day']} {month_name} {month_parts[0]}`\n"
+    text += f"━━━━━━━━━━━━━━━━━━━━━━\n\n"
+
+    if not workers:
+        text += "⚠️ Ushbu davr uchun smena ma'lumotlari hali kiritilmagan.\n"
+        text += "👉 *Smenani kiritish uchun botga ovozli xabar yuboring!*\n\n"
+    else:
+        text += "👥 **XODIMLAR ISH HAQI VA AVANSLAR:**\n"
+        for w in workers:
+            name = w['name']
+            haq = w['total_ish_haqi']
+            avans = w['avanslar']
+            qoldiq = w['qoldiq_to_lanadi']
+            shifts = w['shifts_count']
+            soat_info = f" ({w['soatlar']:.1f} soat)" if w.get('soatlar') else ""
+
+            if avans > 0:
+                text += f"• **{name}:** `{haq:,}` so'm{soat_info} ({shifts} smena)\n"
+                text += f"  ↳ Avans: `-{avans:,}` | **To'lanadi: {qoldiq:,} so'm**\n"
+            else:
+                text += f"• **{name}:** `{haq:,}` so'm{soat_info} ({shifts} smena) — To'lanadi: `{qoldiq:,}`\n"
+        text += "\n"
+
+    text += f"━━━━━━━━━━━━━━━━━━━━━━\n"
+    text += f"💰 **JAMI ISH HAQI FONDI (З/П):** `{summary['total_zp']:,}` so'm\n"
+    text += f"💵 **JAMI KASSA TOPSHIRILDI (Сдано):** `{summary['total_sdano']:,}` so'm\n"
+    text += f"💳 **JAMI KARTADAN YECHILDI:** `{summary['total_karta_yechildi']:,}` so'm\n"
+    if summary['total_avans'] > 0:
+        text += f"⚠️ **Jami berilgan avanslar:** `{summary['total_avans']:,}` so'm\n"
+    if summary['total_xarajat'] > 0:
+        text += f"🧾 **Karta orqali boshqa xarajatlar:** `{summary['total_xarajat']:,}` so'm\n"
+
+    return text
 
 async def check_debt_reminders_task(app):
     """Har 30 daqiqada qarz qaytarish muddati kelganini tekshirib, xabar yuborish"""
@@ -307,28 +648,32 @@ def setup_sheet_header(ws):
 
     ws.row_dimensions[1].height = 28
 
-def create_styled_excel():
+def create_styled_excel(file_path=None):
+    if not file_path:
+        file_path = EXCEL_FILE_PATH
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Barcha Yozuvlar"
     setup_sheet_header(ws)
-    wb.save(EXCEL_FILE_PATH)
+    wb.save(file_path)
     return wb
 
-def init_excel_and_csv():
-    if not os.path.exists(EXCEL_FILE_PATH):
-        create_styled_excel()
-    if not os.path.exists(CSV_FILE_PATH):
-        with open(CSV_FILE_PATH, mode='w', newline='', encoding='utf-8-sig') as f:
+def init_excel_and_csv(user_id=None):
+    paths = get_user_paths(user_id)
+    if not os.path.exists(paths["excel"]):
+        create_styled_excel(paths["excel"])
+    if not os.path.exists(paths["csv"]):
+        with open(paths["csv"], mode='w', newline='', encoding='utf-8-sig') as f:
             writer = csv.writer(f, delimiter=';')
             writer.writerow(HEADERS)
 
 init_excel_and_csv()
 
-def get_all_rows():
+def get_all_rows(user_id=None):
+    paths = get_user_paths(user_id)
     rows = []
-    if os.path.exists(CSV_FILE_PATH):
-        with open(CSV_FILE_PATH, mode='r', encoding='utf-8-sig') as f:
+    if os.path.exists(paths["csv"]):
+        with open(paths["csv"], mode='r', encoding='utf-8-sig') as f:
             reader = csv.reader(f, delimiter=';')
             headers = next(reader, None)
             for idx, row in enumerate(reader, 1):
@@ -555,11 +900,14 @@ def render_in_sheet_summary(ws):
 
     ws.row_dimensions[current_row].height = 24
 
-def delete_specific_row(data_row_id: int):
+def delete_specific_row(data_row_id: int, user_id=None):
+    paths = get_user_paths(user_id)
+    csv_file = paths["csv"]
+    excel_file = paths["excel"]
     deleted_info = None
 
-    if os.path.exists(CSV_FILE_PATH):
-        with open(CSV_FILE_PATH, mode='r', encoding='utf-8-sig') as f:
+    if os.path.exists(csv_file):
+        with open(csv_file, mode='r', encoding='utf-8-sig') as f:
             rows = list(csv.reader(f, delimiter=';'))
 
         header = rows[0] if rows else []
@@ -567,39 +915,52 @@ def delete_specific_row(data_row_id: int):
 
         if 1 <= data_row_id <= len(data_rows):
             removed = data_rows.pop(data_row_id - 1)
+            tushum_val = int(removed[5]) if len(removed) >= 11 and str(removed[5]).isdigit() else (int(removed[4]) if len(removed) >= 9 and str(removed[4]).isdigit() else 0)
+            xarajat_val = int(removed[6]) if len(removed) >= 11 and str(removed[6]).isdigit() else (int(removed[5]) if len(removed) >= 9 and str(removed[5]).isdigit() else 0)
+            nasiya_val = int(removed[7]) if len(removed) >= 11 and str(removed[7]).isdigit() else (int(removed[6]) if len(removed) >= 9 and str(removed[6]).isdigit() else 0)
+            summa = tushum_val or xarajat_val or nasiya_val
+
             deleted_info = {
                 "id": data_row_id,
                 "sana": removed[0],
                 "vaqt": removed[1],
                 "turi": removed[2],
                 "shaxs": removed[3] if len(removed) > 3 else "",
+                "summa": summa,
                 "izoh": removed[10] if len(removed) >= 11 else (removed[8] if len(removed) > 8 else "")
             }
 
-            with open(CSV_FILE_PATH, mode='w', newline='', encoding='utf-8-sig') as f:
+            with open(csv_file, mode='w', newline='', encoding='utf-8-sig') as f:
                 writer = csv.writer(f, delimiter=';')
                 writer.writerow(header)
                 writer.writerows(data_rows)
 
-    if os.path.exists(EXCEL_FILE_PATH):
-        wb = openpyxl.load_workbook(EXCEL_FILE_PATH)
+    if os.path.exists(excel_file):
+        wb = openpyxl.load_workbook(excel_file)
         for sheet_name in wb.sheetnames:
+            if sheet_name == "FastFood_Tabel":
+                continue
             ws = wb[sheet_name]
             excel_row = data_row_id + 1
             if 2 <= excel_row <= ws.max_row:
                 ws.delete_rows(excel_row)
             render_in_sheet_summary(ws)
 
-        wb.save(EXCEL_FILE_PATH)
+        wb.save(excel_file)
 
     return deleted_info
 
-def update_or_add_record(record: dict):
+def update_or_add_record(record: dict, user_id=None):
     """Web App orqali yozuvni qo'shish yoki tahrirlash"""
+    paths = get_user_paths(user_id)
+    csv_file = paths["csv"]
+    excel_file = paths["excel"]
     rec_id = record.get("id")
 
-    with open(CSV_FILE_PATH, mode='r', encoding='utf-8-sig') as f:
-        rows = list(csv.reader(f, delimiter=';'))
+    rows = []
+    if os.path.exists(csv_file):
+        with open(csv_file, mode='r', encoding='utf-8-sig') as f:
+            rows = list(csv.reader(f, delimiter=';'))
 
     header = rows[0] if rows else HEADERS
     data_rows = rows[1:] if len(rows) > 1 else []
@@ -630,10 +991,21 @@ def update_or_add_record(record: dict):
         data_rows.append(new_row)
 
     # CSV ga qayta yozish
-    with open(CSV_FILE_PATH, mode='w', newline='', encoding='utf-8-sig') as f:
+    with open(csv_file, mode='w', newline='', encoding='utf-8-sig') as f:
         writer = csv.writer(f, delimiter=';')
         writer.writerow(header)
         writer.writerows(data_rows)
+
+    # FastFood_Tabel varag'i bo'lsa saqlab qolish
+    ff_ws_rows = None
+    if os.path.exists(excel_file):
+        try:
+            old_wb = openpyxl.load_workbook(excel_file)
+            if "FastFood_Tabel" in old_wb.sheetnames:
+                ff_sheet = old_wb["FastFood_Tabel"]
+                ff_ws_rows = list(ff_sheet.iter_rows(values_only=True))
+        except:
+            pass
 
     # Excelni qayta toza yig'ish
     wb = openpyxl.Workbook()
@@ -661,16 +1033,23 @@ def update_or_add_record(record: dict):
     for s in wb.sheetnames:
         render_in_sheet_summary(wb[s])
 
-    wb.save(EXCEL_FILE_PATH)
+    if ff_ws_rows:
+        ff_ws = wb.create_sheet("FastFood_Tabel")
+        for r_vals in ff_ws_rows:
+            ff_ws.append(list(r_vals))
+
+    wb.save(excel_file)
     return True
 
-def delete_last_entry():
-    rows = get_all_rows()
+def delete_last_entry(user_id=None):
+    rows = get_all_rows(user_id=user_id)
     if rows:
-        return delete_specific_row(len(rows))
+        return delete_specific_row(len(rows), user_id=user_id)
     return None
 
-def get_category_totals(target_month_prefix: str = None):
+def get_category_totals(target_month_prefix: str = None, user_id=None):
+    paths = get_user_paths(user_id)
+    csv_file = paths["csv"]
     tushum_by_cat = {}
     xarajat_by_cat = {}
     nasiya_by_cat = {}
@@ -679,8 +1058,8 @@ def get_category_totals(target_month_prefix: str = None):
     total_xarajat = 0
     total_nasiya = 0
 
-    if os.path.exists(CSV_FILE_PATH):
-        with open(CSV_FILE_PATH, mode='r', encoding='utf-8-sig') as f:
+    if os.path.exists(csv_file):
+        with open(csv_file, mode='r', encoding='utf-8-sig') as f:
             reader = csv.reader(f, delimiter=';')
             headers = next(reader, None)
             for row in reader:
@@ -690,10 +1069,16 @@ def get_category_totals(target_month_prefix: str = None):
                 if target_month_prefix and not date_val.startswith(target_month_prefix):
                     continue
 
-                tushum = int(row[4]) if str(row[4]).isdigit() else 0
-                xarajat = int(row[5]) if str(row[5]).isdigit() else 0
-                nasiya = int(row[6]) if str(row[6]).isdigit() else 0
-                cat = row[7].strip() or "Boshqa"
+                if len(row) >= 11:
+                    tushum = int(row[5]) if str(row[5]).isdigit() else 0
+                    xarajat = int(row[6]) if str(row[6]).isdigit() else 0
+                    nasiya = int(row[7]) if str(row[7]).isdigit() else 0
+                    cat = row[9].strip() or "Boshqa"
+                else:
+                    tushum = int(row[4]) if str(row[4]).isdigit() else 0
+                    xarajat = int(row[5]) if str(row[5]).isdigit() else 0
+                    nasiya = int(row[6]) if str(row[6]).isdigit() else 0
+                    cat = row[7].strip() or "Boshqa"
 
                 if tushum > 0:
                     tushum_by_cat[cat] = tushum_by_cat.get(cat, 0) + tushum
@@ -719,10 +1104,46 @@ GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_WHISPER_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 
-SYSTEM_PROMPT = """Siz O'zbek tili nutqi, moliya va buxgalteriya iboralari bo'yicha mutaxassis AI yordamchisiz.
-Foydalanuvchi ovozli yoki matnli xabarda nima degan bo'lsa (lotin yoki kirill alifbosida), uni tushunib, quyidagi JSON formatiga o'giring.
+SYSTEM_PROMPT = """Siz O'zbek tili nutqi, moliya, fast food oshxonasi va buxgalteriya bo'yicha mutaxassis AI yordamchisiz.
+Foydalanuvchi ovozli yoki matnli xabarda nima degan bo'lsa (lotin yoki kirill alifbosida), uni tushunib, quyidagi 2 TA REJIMDAN BIRIDA toza JSON qaytaring.
 
-MOLIYAVIY OPERATSIYA TURLARI (MUHIM QOIDALAR):
+REJIM 1: FAST FOOD VA ISHCHI HODIMLAR SMENASI (JUDA MUHIM!)
+Agar xabarda fast food oshxonasi, smena, ishchi hodimlar ismi va ularning ishlagan puli/soati, kassa topshirish (sdano/сдано), kartadan yechish (karta/снял с карты) yoki ishchilarga berilgan avanslar aytilgan bo'lsa:
+(Masalan:
+ - "Bugun smenada Nurbek 7700, Jurabek 4500, Mansur 3900, Gobiya 5600, Islom 4500. Kassa topshirildi 13400, kartadan yechildi 13000, Nurbekka 10000 avans berildi"
+ - "Smena: Nurbek 10 soat 7700, Jurabek 8 soat 4500, kassa 25000 topshirildi"
+ - "Kartadan Polatga 5000 avans berildi, dostavkaga 10000 to'landi"
+ - "Bugun smenani yopdik, master Nurbek 7700, Gobiya 5600, sdano 15000")
+
+FAQAT quyidagi JSON formatini qaytaring:
+{
+  "is_fastfood_smena": true,
+  "sana": "YYYY-MM-DD",
+  "hodimlar": [
+    {
+      "ism": "Xodim ismi (masalan: Nurbek, Jurabek, Polat, Mansur, Gobiya, Islom)",
+      "lavozim": "master yoki oshpaz yoki bo'sh",
+      "soat": null,
+      "ish_haqi": 7700
+    }
+  ],
+  "jami_ish_haqi": 26200,
+  "kassa_topshirildi_sdano": 13400,
+  "kartadan_yechildi": 13000,
+  "karta_avans_va_xarajatlar": [
+    {
+      "shaxs": "Xodim ismi",
+      "turi": "avans",
+      "summa": 10000,
+      "izoh": "Nurbekka avans berildi"
+    }
+  ],
+  "izoh": "Smena haqida to'liq xulosa",
+  "toza_matn": "Shovqinsiz chiroyli o'zbekcha matn"
+}
+
+REJIM 2: STANDART MOLIYA AMALLARI (ODDIY DAROMAD VA XARAJATLAR)
+MOLIYAVIY OPERATSIYA TURLARI:
 1. "Tushum" — Haqiqiy sof savdo, daromad, xizmat haqi yoki maosh tushumi bo'lganda (Masalan: "500 ming savdo bo'ldi", "Mijozdan 300 ming pul oldim").
 2. "Xarajat" — Oziq-ovqat, benzin, ijara, maosh berish, do'kon xarajati kabi pul sarflanganda (Masalan: "Benzinga 50 ming to'ladim", "Tushlikka 40 ming sarflandi").
 3. "Nasiya berildi" — Biror shaxsga qarz yoki nasiyaga tovar berilganda (Masalan: "Doniyorga 200 ming qarz berdim", "Ali 100 ming nasiyaga oldi").
@@ -738,22 +1159,20 @@ TELEFON RAQAM VA QO'SHIMCHA MA'LUMOTLARNI 100% TO'G'RI AJRATISH:
 - O'zbekistondagi telefon raqamlari 9 ta raqamdan iborat (masalan: 90 046 16 08 yoki 99 123 45 67 yoki 900461608).
 - Foydalanuvchi "telefon nomeri 90 046 16 08" yoki "raqami 900461608" deb aytsa:
   - "telefon" maydoniga FAQAT va FAQAT shu 9 ta raqamni "+998" bilan boshlab yozing: "+998900461608".
-  - Boshqa hech qanday so'zni, summani yoki sanani telefon raqamiga ARALASHTIRMANG! 9 ta raqamdan ortiq bo'lmasin!
   - Agar telefon aytilmagan bo'lsa -> "" (bo'sh qolsin).
-- Shaxs ismini aniq yozing (Masalan: "Doniyorga" desa, ism "Doniyor" bo'lsin, "Don Yorga" emas!).
-- "izoh" maydoniga foydalanuvchi aytgan har qanday qo'shimcha tafsilotlar, eslatmalar yoki shartlarni to'liq kiriting.
+- Shaxs ismini aniq yozing.
+- "izoh" maydoniga foydalanuvchi aytgan har qanday qo'shimcha tafsilotlarni to'liq kiriting.
 
 O'ZBEKCHA MURAKKAB SONLAR (To'liq hisoblang!):
 - "to'rt yuz sakson ming" / "480k" = 480000 so'm
 - "uch yuz ellik ming" / "350 ming" = 350000 so'm
-- "ikki yuz ming" / "200 ming" = 200000 so'm
 - "bir yarim million" = 1500000 so'm
 - "bir million" = 1000000 so'm
 - "sakson ming" = 80000 so'm
-- "yigirma besh ming" = 25000 so'm
 
 Javobingiz FAQAT toza JSON bo'lishi shart:
 {
+  "is_fastfood_smena": false,
   "turi": "Tushum" yoki "Xarajat" yoki "Nasiya berildi" yoki "Nasiya qaytdi",
   "shaxs": "Mijoz yoki shaxs ismi (bo'lmasa 'Noma'lum')",
   "telefon": "+998XXXXXXXXX yoki bo'sh",
@@ -762,7 +1181,7 @@ Javobingiz FAQAT toza JSON bo'lishi shart:
   "nasiya_som": 0,
   "kategoriya": "Savdo/Qarz munosabatlari/Oziq-ovqat/Transport/Kommunal/Boshqa",
   "izoh": "Tafsilotli to'liq izoh",
-  "toza_matn": "Shovqinsiz chiroyli toza o'zbekcha jumla",
+  "toza_matn": "Shovqinsiz chiroyli o'zbekcha jumla",
   "qaytarish_sanasi": "YYYY-MM-DD yoki null"
 }
 * Eslatma:
@@ -829,6 +1248,115 @@ async def call_groq_parser(prompt_text: str) -> str:
             data = await resp.json()
             return data["choices"][0]["message"]["content"].strip()
 
+
+def parse_with_smart_rules(text: str) -> dict:
+    if not text:
+        return None
+    lower = text.lower()
+
+    # 1. Fast Food smenasi tekshiruvi
+    ff_keywords = ['нурбек', 'журабек', 'мухмуд', 'мухаммаджон', 'нодира', 'робия', 'рохат', 'сдано', 'снял', 'смена']
+    matches = sum(1 for kw in ff_keywords if kw in lower)
+    if matches >= 2:
+        workers_list = [
+            ('Нурбек', ['нурбек', 'nurbek']),
+            ('Журабек', ['журабек', 'jorabek', "jo'rabek"]),
+            ('Мухмуд', ['мухмуд', 'мухаммаджон', 'mahmud', 'muhammadjon']),
+            ('Нодира', ['нодира', 'nodira']),
+            ('Робия', ['робия', 'robiya']),
+            ('Рохат', ['рохат', 'rohat'])
+        ]
+        found_workers = []
+        for disp_name, aliases in workers_list:
+            for al in aliases:
+                m = re.search(rf'{al}\s*[:=-]?\s*(\d+[\d\s.,]*)', lower)
+                if m:
+                    num_val = int(re.sub(r'[^\d]', '', m.group(1)))
+                    found_workers.append({'ism': disp_name, 'ish_haqi': num_val})
+                    break
+
+        sdano_m = re.search(r'(сдано|kassa|topshirildi)\s*[:=-]?\s*(\d+[\d\s.,]*)', lower)
+        sdano = int(re.sub(r'[^\d]', '', sdano_m.group(2))) if sdano_m else 0
+
+        snyal_m = re.search(r'(снял|kartadan|yechildi)\s*(с\s*карты)?\s*[:=-]?\s*(\d+[\d\s.,]*)', lower)
+        snyal = int(re.sub(r'[^\d]', '', snyal_m.group(3))) if snyal_m else 0
+
+        zp = sum(w['ish_haqi'] for w in found_workers)
+        if found_workers or sdano > 0 or snyal > 0:
+            return {
+                "is_fastfood_smena": True,
+                "hodimlar": found_workers,
+                "jami_ish_haqi": zp,
+                "kassa_topshirildi_sdano": sdano,
+                "kartadan_yechildi": snyal,
+                "karta_avans_va_xarajatlar": [],
+                "savdo_viruchka": 0,
+                "izoh": "Kunlik smena",
+                "toza_matn": text
+            }
+
+    # 2. Standart xarajat/tushum/qarz tekshiruvi
+    nums = re.findall(r'\b\d+[\d\s.,]*\b', text)
+    summa = 0
+    if nums:
+        cleaned_nums = [int(re.sub(r'[^\d]', '', n)) for n in nums if re.sub(r'[^\d]', '', n)]
+        if cleaned_nums:
+            summa = max(cleaned_nums)
+            if 'ming' in lower and summa < 10000:
+                summa *= 1000
+            elif ('mln' in lower or 'million' in lower) and summa < 1000:
+                summa *= 1000000
+
+    if summa > 0:
+        if any(w in lower for w in ['qarz berdim', 'nasiya berdim', 'berdim']):
+            return {
+                "turi": "Nasiya berildi",
+                "shaxs": "Mijoz",
+                "tushum_som": 0,
+                "xarajat_som": 0,
+                "nasiya_som": summa,
+                "kategoriya": "Qarz munosabatlari",
+                "izoh": text,
+                "toza_matn": text,
+                "qaytarish_sanasi": None
+            }
+        elif any(w in lower for w in ['qarz qaytdi', 'nasiya qaytdi', 'qaytardi']):
+            return {
+                "turi": "Nasiya qaytdi",
+                "shaxs": "Mijoz",
+                "tushum_som": 0,
+                "xarajat_som": 0,
+                "nasiya_som": summa,
+                "kategoriya": "Qarz munosabatlari",
+                "izoh": text,
+                "toza_matn": text,
+                "qaytarish_sanasi": None
+            }
+        elif any(w in lower for w in ['tushum', 'daromad', 'foyda', 'oldi']):
+            return {
+                "turi": "Tushum",
+                "shaxs": "",
+                "tushum_som": summa,
+                "xarajat_som": 0,
+                "nasiya_som": 0,
+                "kategoriya": "Savdo",
+                "izoh": text,
+                "toza_matn": text
+            }
+        else:
+            return {
+                "turi": "Xarajat",
+                "shaxs": "",
+                "tushum_som": 0,
+                "xarajat_som": summa,
+                "nasiya_som": 0,
+                "kategoriya": "Boshqa",
+                "izoh": text,
+                "toza_matn": text
+            }
+
+    return None
+
 async def parse_note_with_ai(text: str = "", audio_b64: str = None) -> dict:
     now = datetime.datetime.now()
     date_str = now.strftime("%Y-%m-%d")
@@ -857,13 +1385,21 @@ async def parse_note_with_ai(text: str = "", audio_b64: str = None) -> dict:
             last_error = str(e)
 
     if not raw_json:
+        rule_res = parse_with_smart_rules(text)
+        if rule_res:
+            logger.info("✅ Qoidalar orqali muvaffaqiyatli tahlil qilindi")
+            if not rule_res.get("sana"):
+                rule_res["sana"] = date_str
+            rule_res["vaqt"] = time_str
+            return rule_res
         raise Exception(f"AI javob bera olmadi. ({last_error[:100]})")
 
     raw_json = re.sub(r'^```json\s*', '', raw_json)
     raw_json = re.sub(r'\s*```$', '', raw_json)
     parsed = json.loads(raw_json)
 
-    parsed["sana"] = date_str
+    if not parsed.get("sana"):
+        parsed["sana"] = date_str
     parsed["vaqt"] = time_str
     return parsed
 
@@ -879,9 +1415,9 @@ def append_row_to_worksheet(ws, row_data):
     thin_border = Border(left=Side(style='thin', color='D9D9D9'), right=Side(style='thin', color='D9D9D9'), top=Side(style='thin', color='D9D9D9'), bottom=Side(style='thin', color='D9D9D9'))
     
     turi = str(row_data[2] or "").strip().lower()
-    tushum_val = int(row_data[4] or 0)
-    xarajat_val = int(row_data[5] or 0)
-    nasiya_val = int(row_data[6] or 0)
+    tushum_val = int(row_data[5] or 0) if len(row_data) > 5 else int(row_data[4] or 0)
+    xarajat_val = int(row_data[6] or 0) if len(row_data) > 6 else int(row_data[5] or 0)
+    nasiya_val = int(row_data[7] or 0) if len(row_data) > 7 else int(row_data[6] or 0)
 
     if "qaytdi" in turi:
         fill_color = "E2EFDA"  # Yashil (Chunki pul kassaga qaytdi)
@@ -913,8 +1449,12 @@ def append_row_to_worksheet(ws, row_data):
         else:
             cell.alignment = Alignment(horizontal="left", vertical="center")
 
-def append_to_excel_and_csv(data: dict):
-    with open(CSV_FILE_PATH, mode='a', newline='', encoding='utf-8-sig') as f:
+def append_to_excel_and_csv(data: dict, user_id=None):
+    paths = get_user_paths(user_id)
+    csv_file = paths["csv"]
+    excel_file = paths["excel"]
+
+    with open(csv_file, mode='a', newline='', encoding='utf-8-sig') as f:
         writer = csv.writer(f, delimiter=';')
         writer.writerow([
             data.get("sana", ""),
@@ -930,10 +1470,10 @@ def append_to_excel_and_csv(data: dict):
             data.get("izoh", "")
         ])
 
-    if not os.path.exists(EXCEL_FILE_PATH):
-        wb = create_styled_excel()
+    if not os.path.exists(excel_file):
+        wb = create_styled_excel(excel_file)
     else:
-        wb = openpyxl.load_workbook(EXCEL_FILE_PATH)
+        wb = openpyxl.load_workbook(excel_file)
 
     row_data = [
         data.get("sana", ""),
@@ -965,7 +1505,7 @@ def append_to_excel_and_csv(data: dict):
     append_row_to_worksheet(ws_month, row_data)
     render_in_sheet_summary(ws_month)
 
-    wb.save(EXCEL_FILE_PATH)
+    wb.save(excel_file)
 
 WEB_APP_URL = os.environ.get("WEB_APP_URL", "https://moliya-webapp.vercel.app").strip()
 if not WEB_APP_URL.startswith("http"):
@@ -973,34 +1513,45 @@ if not WEB_APP_URL.startswith("http"):
 
 from telegram import WebAppInfo
 
-def get_action_keyboard():
+def get_user_webapp_url(user_id=None) -> str:
+    uid = str(user_id or DEFAULT_USER_ID)
+    base = WEB_APP_URL.split("?")[0]
+    return f"{base}?user_id={uid}"
+
+def get_action_keyboard(user_id=None):
+    url = get_user_webapp_url(user_id)
     keyboard = [
         [
-            InlineKeyboardButton("📱 Moliya & Qarz Web Ilovasi", web_app=WebAppInfo(url=WEB_APP_URL)),
+            InlineKeyboardButton("🌐 Moliya & Qarz Web Ilovasi", web_app=WebAppInfo(url=url)),
         ],
         [
-            InlineKeyboardButton("⏰ Kunlik Hisobot (Daily)", callback_data="daily_digest"),
+            InlineKeyboardButton("🍔 Fast Food Tabel", callback_data="ff_dek_1"),
+            InlineKeyboardButton("⏰ Kunlik Hisobot", callback_data="daily_digest"),
+        ],
+        [
             InlineKeyboardButton("📈 Kategoriya Hisoboti", callback_data="category_report"),
+            InlineKeyboardButton("📋 Yozuvlar", callback_data="show_rows_list"),
         ],
         [
-            InlineKeyboardButton("📋 Yozuvlar Ro'yxati", callback_data="show_rows_list"),
             InlineKeyboardButton("📊 Excel Faylini Yuklash", callback_data="download_excel")
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
 
-def get_reply_menu():
+def get_reply_menu(user_id=None):
+    url = get_user_webapp_url(user_id)
     keyboard = [
-        [KeyboardButton("📱 Moliya & Qarz Ilovasi", web_app=WebAppInfo(url=WEB_APP_URL))],
-        [KeyboardButton("⏰ Kunlik Hisobot (Daily Digest)"), KeyboardButton("📈 Kategoriyalar Hisoboti")],
-        [KeyboardButton("📋 Yozuvlarni ko'rish va o'chirish"), KeyboardButton("📊 Excel Jadvalini Yuklash (.xlsx)")],
-        [KeyboardButton("ℹ️ Yordam")]
+        [KeyboardButton("🌐 Moliya & Qarz Ilovasi", web_app=WebAppInfo(url=url))],
+        [KeyboardButton("🍔 Fast Food Tabel"), KeyboardButton("⏰ Kunlik Hisobot (Daily Digest)")],
+        [KeyboardButton("📈 Kategoriyalar Hisoboti"), KeyboardButton("📋 Yozuvlarni ko'rish va o'chirish")],
+        [KeyboardButton("📊 Excel Jadvalini Yuklash (.xlsx)"), KeyboardButton("ℹ️ Yordam")]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 async def send_rows_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    rows = get_all_rows()
     chat_id = update.effective_chat.id
+    user_id = update.effective_user.id if update.effective_user else chat_id
+    rows = get_all_rows(user_id=user_id)
 
     if not rows:
         text = "⚠️ Jadvalda hali hech qanday yozuv yo'q."
@@ -1036,11 +1587,13 @@ async def send_rows_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=reply_markup)
 
 async def send_category_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id if update.effective_user else chat_id
     now = datetime.datetime.now()
     current_month_prefix = now.strftime("%Y-%m")
     month_name_uz = MONTH_NAMES_UZ.get(now.strftime("%m"), "")
 
-    stats = get_category_totals(target_month_prefix=current_month_prefix)
+    stats = get_category_totals(target_month_prefix=current_month_prefix, user_id=user_id)
 
     t_cats = stats["tushum_by_cat"]
     x_cats = stats["xarajat_by_cat"]
@@ -1085,13 +1638,13 @@ async def send_category_report(update: Update, context: ContextTypes.DEFAULT_TYP
     else:
         await update.message.reply_text(report, parse_mode="Markdown", reply_markup=get_action_keyboard())
 
-def generate_daily_digest(target_date: str = None) -> str:
+def generate_daily_digest(target_date: str = None, user_id=None) -> str:
     """Bugungi (yoki berilgan sanadagi) moliyaviy aylanma va qarzlar bo'yicha to'liq hisobot"""
     now = datetime.datetime.now()
     if not target_date:
         target_date = now.strftime("%Y-%m-%d")
 
-    rows = get_all_rows()
+    rows = get_all_rows(user_id=user_id)
     today_rows = [r for r in rows if r.get("sana") == target_date]
 
     tushum_bugun = 0
@@ -1202,7 +1755,7 @@ def generate_daily_digest(target_date: str = None) -> str:
 
     # Oylik jami
     month_prefix = f"{year_num}-{month_key}"
-    m_stats = get_category_totals(target_month_prefix=month_prefix)
+    m_stats = get_category_totals(target_month_prefix=month_prefix, user_id=user_id)
     m_profit = m_stats.get('sof_foyda', 0)
     m_sign = "+" if m_profit >= 0 else ""
 
@@ -1217,9 +1770,10 @@ def generate_daily_digest(target_date: str = None) -> str:
 
 async def send_daily_digest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
+    user_id = update.effective_user.id if update.effective_user else chat_id
     add_subscriber(chat_id)
     today_str = datetime.datetime.now().strftime("%Y-%m-%d")
-    report = generate_daily_digest(today_str)
+    report = generate_daily_digest(today_str, user_id=user_id)
 
     if update.callback_query:
         try:
@@ -1291,9 +1845,32 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def send_excel_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
+    user_id = update.effective_user.id if update.effective_user else chat_id
+    try:
+        from tabel_sync import sync_fastfood_tabel_file
+        sync_fastfood_tabel_file(user_id)
+    except:
+        pass
+    paths = get_user_paths(user_id)
     await context.bot.send_chat_action(chat_id, ChatAction.UPLOAD_DOCUMENT)
 
-    file_to_send = EXCEL_FILE_PATH if os.path.exists(EXCEL_FILE_PATH) else CSV_FILE_PATH
+    # Fast Food Tabel Excel fayli
+    ff_excel = os.path.join(os.path.dirname(paths["excel"]), "Fast_Food_Tabel_Oktyabr_2026.xlsx")
+    if not os.path.exists(ff_excel):
+        ff_excel = r"d:\Antigravity\123\Fast_Food_Tabel_Oktyabr_2026.xlsx"
+
+    if os.path.exists(ff_excel):
+        with open(ff_excel, 'rb') as doc:
+            await context.bot.send_document(
+                chat_id=chat_id,
+                document=doc,
+                filename="Fast_Food_Tabel_Oktyabr_2026.xlsx",
+                caption="🍔 **Fast Food Xodimlar Tabeli & Kassa Hisoboti (Oktyabr 2026)**\n\n📌 Har bir xodim oyligi, kassa (Сдано), kartadan yechilgan va Karta+ xarajatlari to'liq kiritilgan.",
+                parse_mode="Markdown"
+            )
+        return
+
+    file_to_send = paths["excel"] if os.path.exists(paths["excel"]) else paths["csv"]
 
     if os.path.exists(file_to_send):
         with open(file_to_send, 'rb') as doc:
@@ -1309,7 +1886,8 @@ async def send_excel_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_delete_specific(update: Update, context: ContextTypes.DEFAULT_TYPE, row_id: int):
     chat_id = update.effective_chat.id
-    deleted = delete_specific_row(row_id)
+    user_id = update.effective_user.id if update.effective_user else chat_id
+    deleted = delete_specific_row(row_id, user_id=user_id)
 
     if deleted:
         msg_text = (
@@ -1326,6 +1904,8 @@ async def handle_delete_specific(update: Update, context: ContextTypes.DEFAULT_T
     await send_rows_list(update, context)
 
 async def handle_delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id if update.effective_user else chat_id
     text = update.message.text.strip()
     parts = text.split()
 
@@ -1333,22 +1913,104 @@ async def handle_delete_command(update: Update, context: ContextTypes.DEFAULT_TY
         row_id = int(parts[1])
         await handle_delete_specific(update, context, row_id)
     else:
-        deleted = delete_last_entry()
+        deleted = delete_last_entry(user_id=user_id)
         if deleted:
             msg_text = f"🗑 **Oxirgi yozuv ({deleted['id']}-qator) o'chirildi!** ❌\n📝 *{deleted['izoh']}*"
         else:
             msg_text = "⚠️ O'chirish uchun jadvalda yozuv topilmadi."
         await update.message.reply_text(msg_text, parse_mode="Markdown")
 
+async def send_fastfood_tabel(update: Update, context: ContextTypes.DEFAULT_TYPE, start_day: int = 1, end_day: int = 10, title: str = "1-DEKADA (1-10 KUN)"):
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id if update.effective_user else chat_id
+    now = datetime.datetime.now()
+    month_prefix = now.strftime("%Y-%m")
+    summary = calculate_fastfood_summary(user_id=user_id, month_prefix=month_prefix, start_day=start_day, end_day=end_day)
+    text = format_fastfood_tabel_report(summary, title=title)
+
+    keyboard = [
+        [
+            InlineKeyboardButton("📅 1-Dekada (1-10)", callback_data="ff_dek_1"),
+            InlineKeyboardButton("📅 2-Dekada (11-20)", callback_data="ff_dek_2"),
+        ],
+        [
+            InlineKeyboardButton("📅 3-Dekada (21-31)", callback_data="ff_dek_3"),
+            InlineKeyboardButton("📊 To'liq Oy", callback_data="ff_month_full"),
+        ],
+        [
+            InlineKeyboardButton("📊 Excel Jadvalini Yuklash", callback_data="download_excel"),
+            InlineKeyboardButton("🗑 Smenani o'chirish", callback_data="ff_delete_menu")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    if update.callback_query:
+        try:
+            await update.callback_query.edit_message_text(text, parse_mode="Markdown", reply_markup=reply_markup)
+        except:
+            await context.bot.send_message(chat_id=chat_id, text=text, parse_mode="Markdown", reply_markup=reply_markup)
+    else:
+        await update.message.reply_text(text, parse_mode="Markdown", reply_markup=reply_markup)
+
+
+async def send_fastfood_delete_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id if update.effective_user else chat_id
+    smenas = load_fastfood_smenas(user_id)
+    if not smenas:
+        text = "⚠️ Hali smena yozuvlari yo'q."
+        if update.callback_query:
+            await update.callback_query.edit_message_text(text)
+        else:
+            await context.bot.send_message(chat_id=chat_id, text=text)
+        return
+
+    text = "🗑 **O'CHIRMOQCHI BO'LGAN SMENA SANASINI TANLANG:**\n*(Tugmani bossangiz, o'sha kundagi smena o'chiriladi)*\n"
+    keyboard = []
+    for s in smenas[-8:]:
+        sana = s.get("sana", "")
+        zp = s.get("jami_ish_haqi", 0)
+        keyboard.append([InlineKeyboardButton(f"❌ {sana} smenasi ({zp:,} so'm)", callback_data=f"del_smena_{sana}")])
+    keyboard.append([InlineKeyboardButton("🔙 Tabelga qaytish", callback_data="ff_month_full")])
+
+    if update.callback_query:
+        await update.callback_query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+    else:
+        await context.bot.send_message(chat_id=chat_id, text=text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def handle_delete_smena(update: Update, context: ContextTypes.DEFAULT_TYPE, smena_sana: str):
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id if update.effective_user else chat_id
+    smenas = load_fastfood_smenas(user_id)
+    new_smenas = [s for s in smenas if s.get("sana") != smena_sana]
+    if len(new_smenas) < len(smenas):
+        save_fastfood_smenas(new_smenas, user_id=user_id)
+        try:
+            from tabel_sync import sync_fastfood_tabel_file
+            sync_fastfood_tabel_file(user_id)
+        except:
+            pass
+        msg = f"✅ `{smena_sana}` sanasidagi smena muvaffaqiyatli o'chirildi!"
+    else:
+        msg = f"⚠️ `{smena_sana}` sanasidagi smena topilmadi."
+
+    if update.callback_query:
+        await update.callback_query.edit_message_text(msg, parse_mode="Markdown")
+    else:
+        await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
+    await send_fastfood_tabel(update, context, start_day=1, end_day=31, title="To'liq Oylik Tabel")
+
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
 
+    user_id = update.effective_user.id if update.effective_user else update.effective_chat.id
+
     if data in ("download_excel", "download_csv"):
         await send_excel_file(update, context)
     elif data == "delete_last":
-        rows = get_all_rows()
+        rows = get_all_rows(user_id=user_id)
         if rows:
             await handle_delete_specific(update, context, rows[-1]["id"])
     elif data == "show_rows_list":
@@ -1357,6 +2019,19 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_category_report(update, context)
     elif data == "daily_digest":
         await send_daily_digest(update, context)
+    elif data == "ff_dek_1":
+        await send_fastfood_tabel(update, context, start_day=1, end_day=10, title="1-Dekada (1-10 kun)")
+    elif data == "ff_dek_2":
+        await send_fastfood_tabel(update, context, start_day=11, end_day=20, title="2-Dekada (11-20 kun)")
+    elif data == "ff_dek_3":
+        await send_fastfood_tabel(update, context, start_day=21, end_day=31, title="3-Dekada (21-31 kun)")
+    elif data == "ff_delete_menu":
+        await send_fastfood_delete_menu(update, context)
+    elif data.startswith("del_smena_"):
+        smena_sana = data.replace("del_smena_", "")
+        await handle_delete_smena(update, context, smena_sana)
+    elif data == "ff_month_full":
+        await send_fastfood_tabel(update, context, start_day=1, end_day=31, title="To'liq Oylik Tabel")
     elif data.startswith("del_row_"):
         row_id = int(data.replace("del_row_", ""))
         await handle_delete_specific(update, context, row_id)
@@ -1366,8 +2041,44 @@ async def handle_text_or_voice(update: Update, context: ContextTypes.DEFAULT_TYP
     if not msg:
         return
 
-    add_subscriber(msg.chat.id)
+    user_id = msg.chat.id
+    add_subscriber(user_id)
     text_input = msg.text or ""
+
+    # Groq API kalitini chatdan to'g'ridan-to'g'ri o'rnatish
+    clean_text = text_input.strip()
+    if clean_text.startswith("gsk_") or "gsk_" in clean_text:
+        m = re.search(r'(gsk_[a-zA-Z0-9_-]+)', clean_text)
+        if m:
+            new_groq_key = m.group(1)
+            try:
+                headers = {"Authorization": f"Bearer {new_groq_key}"}
+                async with aiohttp.ClientSession() as session:
+                    async with session.get("https://api.groq.com/openai/v1/models", headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                        if resp.status == 200:
+                            cfg_path = os.path.join(os.path.dirname(__file__), "config.py")
+                            if os.path.exists(cfg_path):
+                                with open(cfg_path, "r", encoding="utf-8") as f:
+                                    c_text = f.read()
+                                c_text = re.sub(r"GROQ_API_KEY\s*=\s*\"[^\"]*\"", f"GROQ_API_KEY = \"{new_groq_key}\"", c_text)
+                                with open(cfg_path, "w", encoding="utf-8") as f:
+                                    f.write(c_text)
+                            global GROQ_API_KEY
+                            GROQ_API_KEY = new_groq_key
+                            os.environ["GROQ_API_KEY"] = new_groq_key
+                            success_msg = (
+                                "🎉 **Groq AI Kaliti Muvaffaqiyatli O'rnatildi va Tekshirildi!** ✅\n\n"
+                                "🎙 Endi bemalol menga **ovozli xabar (golosovoy)** yuborishingiz mumkin!\n"
+                                "Bot barcha xodimlaringiz, smenalar va kassa to'lovlarini eshitib, jadvalga yozib boradi."
+                            )
+                            await msg.reply_text(success_msg, parse_mode="Markdown")
+                            return
+                        else:
+                            await msg.reply_text("❌ Ushbu Groq kaliti ishlamadi (xato kalit). Iltimos, console.groq.com/keys dan yangi kalit olib yuboring.")
+                            return
+            except Exception as test_err:
+                await msg.reply_text(f"❌ Kalitni tekshirishda xatolik: {test_err}")
+                return
 
     if text_input in ("📊 Excel Jadvalini Yuklash (.xlsx)", "📊 Jadvalni yuklab olish (Excel)", "/jadval"):
         await send_excel_file(update, context)
@@ -1377,6 +2088,9 @@ async def handle_text_or_voice(update: Update, context: ContextTypes.DEFAULT_TYP
         return
     elif text_input in ("⏰ Kunlik Hisobot (Daily Digest)", "⏰ Kunlik Hisobot", "/kunlik", "/digest", "/kunlik_hisobot"):
         await send_daily_digest(update, context)
+        return
+    elif text_input in ("🍔 Fast Food Tabel", "Fast Food Tabel", "/tabel", "/smena"):
+        await send_fastfood_tabel(update, context, start_day=1, end_day=10, title="1-Dekada (1-10 kun)")
         return
     elif text_input in ("📋 Yozuvlarni ko'rish va o'chirish", "/royxat", "/yozuvlar"):
         await send_rows_list(update, context)
@@ -1415,18 +2129,66 @@ async def handle_text_or_voice(update: Update, context: ContextTypes.DEFAULT_TYP
                 text_input = transcribed_text
             except Exception as w_err:
                 logger.warning(f"Whisper xatosi: {w_err}")
+                if "401" in str(w_err) or "Invalid API Key" in str(w_err) or "invalid_api_key" in str(w_err):
+                    await wait_msg.delete()
+                    guide_msg = (
+                        "⚠️ **Ovozli xabarni (golosovoy) eshitish uchun bepul Groq AI kaliti kerak!**\n\n"
+                        "🔑 **Kalitni olish juda oson (1 daqiqa):**\n"
+                        "1️⃣ [console.groq.com/keys](https://console.groq.com/keys) saytiga kiring (Google orqali kiring)\n"
+                        "2️⃣ **\"Create API Key\"** tugmasini bosing\n"
+                        "3️⃣ Chiqqan kalitni (`gsk_...`) nusxalab, **to'g'ridan-to'g'ri shu chatga yuboring**!\n\n"
+                        "💡 *Siz chatga tashlashingiz bilan men uni o'zim avtomatik o'rnatib olaman va ovozingizni eshitadigan bo'laman.*"
+                    )
+                    await msg.reply_text(guide_msg, parse_mode="Markdown", disable_web_page_preview=True)
+                    return
                 text_input = msg.caption or "Ovozli xabarni tahlil qil"
 
         res = await parse_note_with_ai(text=text_input, audio_b64=audio_b64)
 
-        append_to_excel_and_csv(res)
+        # REJIM 1: FAST FOOD SMENASI
+        if res.get("is_fastfood_smena"):
+            smenas = load_fastfood_smenas(user_id=user_id)
+            smenas.append(res)
+            save_fastfood_smenas(smenas, user_id=user_id)
+
+            try:
+                append_fastfood_smena_to_excel(res, user_id=user_id)
+            except Exception as ex_err:
+                logger.error(f"Excel smena saqlash xatosi: {ex_err}")
+
+            await wait_msg.delete()
+
+            reply_text = format_fastfood_shift_message(res)
+            ff_kb = [
+                [
+                    InlineKeyboardButton("📅 1-Dekada (1-10)", callback_data="ff_dek_1"),
+                    InlineKeyboardButton("📅 2-Dekada (11-20)", callback_data="ff_dek_2"),
+                ],
+                [
+                    InlineKeyboardButton("📅 3-Dekada (21-31)", callback_data="ff_dek_3"),
+                    InlineKeyboardButton("📊 To'liq Oy", callback_data="ff_month_full"),
+                ],
+                [
+                    InlineKeyboardButton("🌐 Fast Food WebApp", web_app=WebAppInfo(url=f"{get_user_webapp_url(user_id)}&tab=fastfood")),
+                    InlineKeyboardButton("📊 Excel Yuklash", callback_data="download_excel")
+                ]
+            ]
+            await msg.reply_text(
+                reply_text,
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup(ff_kb)
+            )
+            return
+
+        # REJIM 2: STANDART MOLIYA AMALI
+        append_to_excel_and_csv(res, user_id=user_id)
 
         # Agar qarz berilgan bo'lsa va qaytarish sanasi ko'rsatilgan bo'lsa, eslatmalar ro'yxatiga saqlaymiz
         qaytarish_sanasi = res.get("qaytarish_sanasi")
         if qaytarish_sanasi and ("nasiya" in str(res.get("turi", "")).lower() or "berildi" in str(res.get("turi", "")).lower()):
-            reminders = load_debt_reminders()
+            reminders = load_debt_reminders(user_id=user_id)
             reminders.append({
-                "chat_id": msg.chat.id,
+                "chat_id": user_id,
                 "shaxs": res.get("shaxs", "Noma'lum"),
                 "telefon": res.get("telefon", ""),
                 "boshlangich_qarz": int(res.get("nasiya_som", 0)),
@@ -1435,8 +2197,8 @@ async def handle_text_or_voice(update: Update, context: ContextTypes.DEFAULT_TYP
                 "izoh": res.get("izoh"),
                 "ogohlantirildi": False
             })
-            save_debt_reminders(reminders)
-            logger.info(f"⏰ Qarz eslatmasi saqlandi: {res.get('shaxs')} -> {qaytarish_sanasi}")
+            save_debt_reminders(reminders, user_id=user_id)
+            logger.info(f"⏰ Qarz eslatmasi saqlandi ({user_id}): {res.get('shaxs')} -> {qaytarish_sanasi}")
 
         await wait_msg.delete()
 
@@ -1472,7 +2234,7 @@ async def handle_text_or_voice(update: Update, context: ContextTypes.DEFAULT_TYP
         await msg.reply_text(
             reply_text,
             parse_mode="Markdown",
-            reply_markup=get_action_keyboard()
+            reply_markup=get_action_keyboard(user_id=user_id)
         )
 
     except Exception as e:
@@ -1528,11 +2290,12 @@ async def run_server_webhook(app, port: int, external_url: str):
         return web.Response(text="Web App UI yuklanmoqda...")
 
     async def api_get_data(request):
-        rows = get_all_rows()
+        user_id = request.query.get("user_id") or DEFAULT_USER_ID
+        rows = get_all_rows(user_id=user_id)
         now = datetime.datetime.now()
         current_month_prefix = now.strftime("%Y-%m")
-        stats = get_category_totals(target_month_prefix=current_month_prefix)
-        reminders = load_debt_reminders()
+        stats = get_category_totals(target_month_prefix=current_month_prefix, user_id=user_id)
+        reminders = load_debt_reminders(user_id=user_id)
 
         # Faol qarzdorlar ro'yxatini hisoblaymiz
         debt_persons = {}
@@ -1585,6 +2348,13 @@ async def run_server_webhook(app, port: int, external_url: str):
         sum_qoldiq_debt = sum(d["qoldiq"] for d in active_debts)
         kassa_balansi = total_tushum - total_xarajat - sum_qoldiq_debt
 
+        # Fast food xulosalari
+        ff_smenas = load_fastfood_smenas(user_id=user_id)
+        ff_dek_1 = calculate_fastfood_summary(user_id=user_id, month_prefix=current_month_prefix, start_day=1, end_day=10)
+        ff_dek_2 = calculate_fastfood_summary(user_id=user_id, month_prefix=current_month_prefix, start_day=11, end_day=20)
+        ff_dek_3 = calculate_fastfood_summary(user_id=user_id, month_prefix=current_month_prefix, start_day=21, end_day=31)
+        ff_month = calculate_fastfood_summary(user_id=user_id, month_prefix=current_month_prefix, start_day=1, end_day=31)
+
         return web.json_response({
             "transactions": rows,
             "debts": active_debts,
@@ -1593,13 +2363,21 @@ async def run_server_webhook(app, port: int, external_url: str):
                 "nasiya_qoldiq": sum_qoldiq_debt,
                 "kassa_balansi": kassa_balansi,
                 "kategoriya_xarajatlar": stats.get("xarajat_by_cat", {})
+            },
+            "fastfood": {
+                "smenas": ff_smenas,
+                "dekada_1": ff_dek_1,
+                "dekada_2": ff_dek_2,
+                "dekada_3": ff_dek_3,
+                "month": ff_month
             }
         })
 
     async def api_save_record(request):
         try:
             data = await request.json()
-            update_or_add_record(data)
+            user_id = request.query.get("user_id") or data.get("user_id") or DEFAULT_USER_ID
+            update_or_add_record(data, user_id=user_id)
             return web.json_response({"ok": True})
         except Exception as e:
             return web.json_response({"ok": False, "error": str(e)}, status=500)
@@ -1607,14 +2385,17 @@ async def run_server_webhook(app, port: int, external_url: str):
     async def api_delete_record(request):
         try:
             rec_id = int(request.match_info['id'])
-            delete_specific_row(rec_id)
+            user_id = request.query.get("user_id") or DEFAULT_USER_ID
+            delete_specific_row(rec_id, user_id=user_id)
             return web.json_response({"ok": True})
         except Exception as e:
             return web.json_response({"ok": False, "error": str(e)}, status=500)
 
     async def serve_download_excel(request):
-        if os.path.exists(EXCEL_FILE_PATH):
-            return web.FileResponse(EXCEL_FILE_PATH, headers={
+        user_id = request.query.get("user_id") or DEFAULT_USER_ID
+        paths = get_user_paths(user_id)
+        if os.path.exists(paths["excel"]):
+            return web.FileResponse(paths["excel"], headers={
                 "Content-Disposition": 'attachment; filename="Mening_Moliya_Jadvalim.xlsx"'
             })
         return web.Response(text="Fayl topilmadi", status=404)
@@ -1651,6 +2432,8 @@ def main():
     )
 
     app.add_handler(CommandHandler("start", start_command))
+    app.add_handler(CommandHandler("tabel", send_fastfood_tabel))
+    app.add_handler(CommandHandler("smena", send_fastfood_tabel))
     app.add_handler(CommandHandler("kunlik", send_daily_digest))
     app.add_handler(CommandHandler("digest", send_daily_digest))
     app.add_handler(CommandHandler("kunlik_hisobot", send_daily_digest))

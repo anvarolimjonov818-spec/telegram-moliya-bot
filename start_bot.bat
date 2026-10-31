@@ -71,7 +71,7 @@ echo ║  To'xtatish uchun: Ctrl+C                  ║
 echo ╚══════════════════════════════════════════════╝
 echo.
 
-"%PYTHON_PATH%" bot.py
+"%PYTHON_PATH%" sheets_ai_bot.py
 
 if errorlevel 1 (
     echo.

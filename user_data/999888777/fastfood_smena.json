@@ -1,0 +1,1018 @@
+[
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-01",
+    "vaqt": "22:00",
+    "hodimlar": [
+      {
+        "ism": "Нурбек",
+        "ish_haqi": 8100
+      },
+      {
+        "ism": "Журабек",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Мухмуд",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Робия",
+        "ish_haqi": 6000
+      },
+      {
+        "ism": "Рохат",
+        "ish_haqi": 4000
+      }
+    ],
+    "jami_ish_haqi": 27100,
+    "kassa_topshirildi_sdano": 10000,
+    "kartadan_yechildi": 17000,
+    "karta_avans_va_xarajatlar": [],
+    "savdo_viruchka": 0,
+    "izoh": "1-oktyabr smenasi"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-02",
+    "vaqt": "22:00",
+    "hodimlar": [
+      {
+        "ism": "Нурбек",
+        "ish_haqi": 8900
+      },
+      {
+        "ism": "Журабек",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Мухмуд",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Робия",
+        "ish_haqi": 7000
+      },
+      {
+        "ism": "Рохат",
+        "ish_haqi": 4100
+      }
+    ],
+    "jami_ish_haqi": 29000,
+    "kassa_topshirildi_sdano": 6600,
+    "kartadan_yechildi": 22500,
+    "karta_avans_va_xarajatlar": [],
+    "savdo_viruchka": 0,
+    "izoh": "2-oktyabr smenasi"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-03",
+    "vaqt": "22:00",
+    "hodimlar": [
+      {
+        "ism": "Нурбек",
+        "ish_haqi": 9300
+      },
+      {
+        "ism": "Журабек",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Мухмуд",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Робия",
+        "ish_haqi": 7500
+      },
+      {
+        "ism": "Рохат",
+        "ish_haqi": 4200
+      }
+    ],
+    "jami_ish_haqi": 30000,
+    "kassa_topshirildi_sdano": 6400,
+    "kartadan_yechildi": 23600,
+    "karta_avans_va_xarajatlar": [
+      {
+        "shaxs": "Страхов 513",
+        "turi": "xarajat",
+        "summa": 9000,
+        "izoh": "Страховка 513"
+      }
+    ],
+    "savdo_viruchka": 0,
+    "izoh": "3-oktyabr smenasi"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-04",
+    "vaqt": "22:00",
+    "hodimlar": [
+      {
+        "ism": "Нурбек",
+        "ish_haqi": 6100
+      },
+      {
+        "ism": "Журабек",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Мухмуд",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Нодира",
+        "ish_haqi": 4600
+      },
+      {
+        "ism": "Рохат",
+        "ish_haqi": 3500
+      }
+    ],
+    "jami_ish_haqi": 23200,
+    "kassa_topshirildi_sdano": 10900,
+    "kartadan_yechildi": 12500,
+    "karta_avans_va_xarajatlar": [],
+    "savdo_viruchka": 0,
+    "izoh": "4-oktyabr smenasi"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-05",
+    "vaqt": "22:00",
+    "hodimlar": [
+      {
+        "ism": "Нурбек",
+        "ish_haqi": 6900
+      },
+      {
+        "ism": "Журабек",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Мухмуд",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Нодира",
+        "ish_haqi": 5000
+      },
+      {
+        "ism": "Рохат",
+        "ish_haqi": 3700
+      }
+    ],
+    "jami_ish_haqi": 24600,
+    "kassa_topshirildi_sdano": 10200,
+    "kartadan_yechildi": 14500,
+    "karta_avans_va_xarajatlar": [],
+    "savdo_viruchka": 0,
+    "izoh": "5-oktyabr smenasi"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-06",
+    "vaqt": "22:00",
+    "hodimlar": [
+      {
+        "ism": "Журабек",
+        "ish_haqi": 7300
+      },
+      {
+        "ism": "Мухмуд",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Нодира",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Робия",
+        "ish_haqi": 5200
+      },
+      {
+        "ism": "Рохат",
+        "ish_haqi": 3900
+      }
+    ],
+    "jami_ish_haqi": 25400,
+    "kassa_topshirildi_sdano": 6350,
+    "kartadan_yechildi": 19000,
+    "karta_avans_va_xarajatlar": [],
+    "savdo_viruchka": 0,
+    "izoh": "6-oktyabr smenasi"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-07",
+    "vaqt": "22:00",
+    "hodimlar": [
+      {
+        "ism": "Нурбек",
+        "ish_haqi": 7700
+      },
+      {
+        "ism": "Журабек",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Нодира",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Робия",
+        "ish_haqi": 5600
+      },
+      {
+        "ism": "Рохат",
+        "ish_haqi": 3900
+      }
+    ],
+    "jami_ish_haqi": 26200,
+    "kassa_topshirildi_sdano": 15300,
+    "kartadan_yechildi": 11000,
+    "karta_avans_va_xarajatlar": [],
+    "savdo_viruchka": 0,
+    "izoh": "7-oktyabr smenasi"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-08",
+    "vaqt": "22:00",
+    "hodimlar": [
+      {
+        "ism": "Нурбек",
+        "ish_haqi": 7300
+      },
+      {
+        "ism": "Журабек",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Мухмуд",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Нодира",
+        "ish_haqi": 5200
+      },
+      {
+        "ism": "Рохат",
+        "ish_haqi": 3800
+      }
+    ],
+    "jami_ish_haqi": 25300,
+    "kassa_topshirildi_sdano": 9550,
+    "kartadan_yechildi": 16000,
+    "karta_avans_va_xarajatlar": [],
+    "savdo_viruchka": 0,
+    "izoh": "8-oktyabr smenasi"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-09",
+    "vaqt": "22:00",
+    "hodimlar": [
+      {
+        "ism": "Нурбек",
+        "ish_haqi": 7700
+      },
+      {
+        "ism": "Журабек",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Мухмуд",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Нодира",
+        "ish_haqi": 5600
+      },
+      {
+        "ism": "Рохат",
+        "ish_haqi": 3900
+      }
+    ],
+    "jami_ish_haqi": 26200,
+    "kassa_topshirildi_sdano": 11000,
+    "kartadan_yechildi": 15000,
+    "karta_avans_va_xarajatlar": [
+      {
+        "shaxs": "Блогер",
+        "turi": "xarajat",
+        "summa": 10000,
+        "izoh": "Блогер реклама"
+      }
+    ],
+    "savdo_viruchka": 0,
+    "izoh": "9-oktyabr smenasi"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-10",
+    "vaqt": "22:00",
+    "hodimlar": [
+      {
+        "ism": "Нурбек",
+        "ish_haqi": 7300
+      },
+      {
+        "ism": "Журабек",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Мухмуд",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Нодира",
+        "ish_haqi": 5200
+      },
+      {
+        "ism": "Рохат",
+        "ish_haqi": 3800
+      }
+    ],
+    "jami_ish_haqi": 25300,
+    "kassa_topshirildi_sdano": 2700,
+    "kartadan_yechildi": 22500,
+    "karta_avans_va_xarajatlar": [],
+    "savdo_viruchka": 0,
+    "izoh": "10-oktyabr smenasi"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-11",
+    "vaqt": "22:00",
+    "hodimlar": [
+      {
+        "ism": "Нурбек",
+        "ish_haqi": 6900
+      },
+      {
+        "ism": "Журабек",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Мухмуд",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Нодира",
+        "ish_haqi": 5000
+      },
+      {
+        "ism": "Рохат",
+        "ish_haqi": 3700
+      }
+    ],
+    "jami_ish_haqi": 24600,
+    "kassa_topshirildi_sdano": 6300,
+    "kartadan_yechildi": 18500,
+    "karta_avans_va_xarajatlar": [],
+    "savdo_viruchka": 0,
+    "izoh": "11-oktyabr smenasi"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-12",
+    "vaqt": "22:00",
+    "hodimlar": [
+      {
+        "ism": "Нурбек",
+        "ish_haqi": 6500
+      },
+      {
+        "ism": "Журабек",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Мухмуд",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Нодира",
+        "ish_haqi": 4800
+      },
+      {
+        "ism": "Рохат",
+        "ish_haqi": 3600
+      }
+    ],
+    "jami_ish_haqi": 23900,
+    "kassa_topshirildi_sdano": 8000,
+    "kartadan_yechildi": 16000,
+    "karta_avans_va_xarajatlar": [
+      {
+        "shaxs": "Блогер",
+        "turi": "xarajat",
+        "summa": 5000,
+        "izoh": "Блогер реклама"
+      }
+    ],
+    "savdo_viruchka": 0,
+    "izoh": "12-oktyabr smenasi"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-13",
+    "vaqt": "22:00",
+    "hodimlar": [
+      {
+        "ism": "Журабек",
+        "ish_haqi": 7300
+      },
+      {
+        "ism": "Мухмуд",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Нодира",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Робия",
+        "ish_haqi": 5200
+      },
+      {
+        "ism": "Рохат",
+        "ish_haqi": 3800
+      }
+    ],
+    "jami_ish_haqi": 25300,
+    "kassa_topshirildi_sdano": 10200,
+    "kartadan_yechildi": 15000,
+    "karta_avans_va_xarajatlar": [
+      {
+        "shaxs": "Блогер",
+        "turi": "xarajat",
+        "summa": 10000,
+        "izoh": "Блогер реклама"
+      }
+    ],
+    "savdo_viruchka": 0,
+    "izoh": "13-oktyabr smenasi"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-14",
+    "vaqt": "22:00",
+    "hodimlar": [
+      {
+        "ism": "Нурбек",
+        "ish_haqi": 8100
+      },
+      {
+        "ism": "Мухмуд",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Нодира",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Робия",
+        "ish_haqi": 6000
+      },
+      {
+        "ism": "Рохат",
+        "ish_haqi": 4000
+      }
+    ],
+    "jami_ish_haqi": 27100,
+    "kassa_topshirildi_sdano": 4300,
+    "kartadan_yechildi": 23000,
+    "karta_avans_va_xarajatlar": [
+      {
+        "shaxs": "Холод",
+        "turi": "xarajat",
+        "summa": 9000,
+        "izoh": "Холод восстание"
+      }
+    ],
+    "savdo_viruchka": 0,
+    "izoh": "14-oktyabr smenasi"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-15",
+    "vaqt": "22:00",
+    "hodimlar": [
+      {
+        "ism": "Нурбек",
+        "ish_haqi": 8100
+      },
+      {
+        "ism": "Журабек",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Мухмуд",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Робия",
+        "ish_haqi": 6000
+      },
+      {
+        "ism": "Рохат",
+        "ish_haqi": 4000
+      }
+    ],
+    "jami_ish_haqi": 27100,
+    "kassa_topshirildi_sdano": 7350,
+    "kartadan_yechildi": 19750,
+    "karta_avans_va_xarajatlar": [],
+    "savdo_viruchka": 0,
+    "izoh": "15-oktyabr smenasi"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-16",
+    "vaqt": "22:00",
+    "hodimlar": [
+      {
+        "ism": "Нурбек",
+        "ish_haqi": 7700
+      },
+      {
+        "ism": "Журабек",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Нодира",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Робия",
+        "ish_haqi": 5600
+      },
+      {
+        "ism": "Рохат",
+        "ish_haqi": 3800
+      }
+    ],
+    "jami_ish_haqi": 26100,
+    "kassa_topshirildi_sdano": 8000,
+    "kartadan_yechildi": 18100,
+    "karta_avans_va_xarajatlar": [],
+    "savdo_viruchka": 0,
+    "izoh": "16-oktyabr smenasi"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-17",
+    "vaqt": "22:00",
+    "hodimlar": [
+      {
+        "ism": "Нурбек",
+        "ish_haqi": 9300
+      },
+      {
+        "ism": "Журабек",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Мухмуд",
+        "ish_haqi": 4200
+      },
+      {
+        "ism": "Нодира",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Робия",
+        "ish_haqi": 7500
+      }
+    ],
+    "jami_ish_haqi": 30000,
+    "kassa_topshirildi_sdano": 7400,
+    "kartadan_yechildi": 27600,
+    "karta_avans_va_xarajatlar": [],
+    "savdo_viruchka": 0,
+    "izoh": "17-oktyabr smenasi"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-18",
+    "vaqt": "22:00",
+    "hodimlar": [
+      {
+        "ism": "Нурбек",
+        "ish_haqi": 6900
+      },
+      {
+        "ism": "Журабек",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Мухмуд",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Нодира",
+        "ish_haqi": 5000
+      },
+      {
+        "ism": "Рохат",
+        "ish_haqi": 3700
+      }
+    ],
+    "jami_ish_haqi": 24600,
+    "kassa_topshirildi_sdano": 14500,
+    "kartadan_yechildi": 10100,
+    "karta_avans_va_xarajatlar": [],
+    "savdo_viruchka": 0,
+    "izoh": "18-oktyabr smenasi"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-19",
+    "vaqt": "22:00",
+    "hodimlar": [
+      {
+        "ism": "Нурбек",
+        "ish_haqi": 7700
+      },
+      {
+        "ism": "Журабек",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Мухмуд",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Нодира",
+        "ish_haqi": 5600
+      },
+      {
+        "ism": "Рохат",
+        "ish_haqi": 3900
+      }
+    ],
+    "jami_ish_haqi": 26200,
+    "kassa_topshirildi_sdano": 1550,
+    "kartadan_yechildi": 24650,
+    "karta_avans_va_xarajatlar": [],
+    "savdo_viruchka": 0,
+    "izoh": "19-oktyabr smenasi"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-20",
+    "vaqt": "22:00",
+    "hodimlar": [
+      {
+        "ism": "Журабек",
+        "ish_haqi": 7300
+      },
+      {
+        "ism": "Мухмуд",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Нодира",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Робия",
+        "ish_haqi": 5200
+      },
+      {
+        "ism": "Рохат",
+        "ish_haqi": 3800
+      }
+    ],
+    "jami_ish_haqi": 25300,
+    "kassa_topshirildi_sdano": 8950,
+    "kartadan_yechildi": 16350,
+    "karta_avans_va_xarajatlar": [],
+    "savdo_viruchka": 0,
+    "izoh": "20-oktyabr smenasi"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-21",
+    "vaqt": "22:00",
+    "hodimlar": [
+      {
+        "ism": "Нурбек",
+        "ish_haqi": 8100
+      },
+      {
+        "ism": "Мухмуд",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Нодира",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Робия",
+        "ish_haqi": 6000
+      },
+      {
+        "ism": "Рохат",
+        "ish_haqi": 4000
+      }
+    ],
+    "jami_ish_haqi": 27100,
+    "kassa_topshirildi_sdano": 1500,
+    "kartadan_yechildi": 25600,
+    "karta_avans_va_xarajatlar": [],
+    "savdo_viruchka": 0,
+    "izoh": "21-oktyabr smenasi"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-22",
+    "vaqt": "22:00",
+    "hodimlar": [
+      {
+        "ism": "Нурбек",
+        "ish_haqi": 8100
+      },
+      {
+        "ism": "Журабек",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Нодира",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Робия",
+        "ish_haqi": 6000
+      },
+      {
+        "ism": "Рохат",
+        "ish_haqi": 4000
+      }
+    ],
+    "jami_ish_haqi": 27100,
+    "kassa_topshirildi_sdano": 600,
+    "kartadan_yechildi": 26500,
+    "karta_avans_va_xarajatlar": [],
+    "savdo_viruchka": 0,
+    "izoh": "22-oktyabr smenasi"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-23",
+    "vaqt": "22:00",
+    "hodimlar": [
+      {
+        "ism": "Нурбек",
+        "ish_haqi": 10100
+      },
+      {
+        "ism": "Журабек",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Мухмуд",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Робия",
+        "ish_haqi": 8400
+      },
+      {
+        "ism": "Рохат",
+        "ish_haqi": 4500
+      }
+    ],
+    "jami_ish_haqi": 32000,
+    "kassa_topshirildi_sdano": 0,
+    "kartadan_yechildi": 32000,
+    "karta_avans_va_xarajatlar": [],
+    "savdo_viruchka": 0,
+    "izoh": "23-oktyabr smenasi"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-24",
+    "vaqt": "22:00",
+    "hodimlar": [
+      {
+        "ism": "Нурбек",
+        "ish_haqi": 8900
+      },
+      {
+        "ism": "Журабек",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Мухмуд",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Нодира",
+        "ish_haqi": 4100
+      },
+      {
+        "ism": "Робия",
+        "ish_haqi": 7000
+      }
+    ],
+    "jami_ish_haqi": 29000,
+    "kassa_topshirildi_sdano": 3400,
+    "kartadan_yechildi": 25600,
+    "karta_avans_va_xarajatlar": [],
+    "savdo_viruchka": 0,
+    "izoh": "24-oktyabr smenasi"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-25",
+    "vaqt": "22:00",
+    "hodimlar": [
+      {
+        "ism": "Нурбек",
+        "ish_haqi": 6900
+      },
+      {
+        "ism": "Журабек",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Мухмуд",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Нодира",
+        "ish_haqi": 5000
+      },
+      {
+        "ism": "Рохат",
+        "ish_haqi": 3700
+      }
+    ],
+    "jami_ish_haqi": 24600,
+    "kassa_topshirildi_sdano": 12500,
+    "kartadan_yechildi": 12100,
+    "karta_avans_va_xarajatlar": [],
+    "savdo_viruchka": 0,
+    "izoh": "25-oktyabr smenasi"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-26",
+    "vaqt": "22:00",
+    "hodimlar": [
+      {
+        "ism": "Нурбек",
+        "ish_haqi": 7700
+      },
+      {
+        "ism": "Журабек",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Мухмуд",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Нодира",
+        "ish_haqi": 5600
+      },
+      {
+        "ism": "Рохат",
+        "ish_haqi": 3900
+      }
+    ],
+    "jami_ish_haqi": 26200,
+    "kassa_topshirildi_sdano": 1050,
+    "kartadan_yechildi": 25150,
+    "karta_avans_va_xarajatlar": [],
+    "savdo_viruchka": 0,
+    "izoh": "26-oktyabr smenasi"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-27",
+    "vaqt": "22:00",
+    "hodimlar": [
+      {
+        "ism": "Журабек",
+        "ish_haqi": 7700
+      },
+      {
+        "ism": "Мухмуд",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Нодира",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Робия",
+        "ish_haqi": 5600
+      },
+      {
+        "ism": "Рохат",
+        "ish_haqi": 3900
+      }
+    ],
+    "jami_ish_haqi": 26200,
+    "kassa_topshirildi_sdano": 10100,
+    "kartadan_yechildi": 16100,
+    "karta_avans_va_xarajatlar": [],
+    "savdo_viruchka": 0,
+    "izoh": "27-oktyabr smenasi"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-28",
+    "vaqt": "22:00",
+    "hodimlar": [
+      {
+        "ism": "Нурбек",
+        "ish_haqi": 8100
+      },
+      {
+        "ism": "Мухмуд",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Нодира",
+        "ish_haqi": 4500
+      },
+      {
+        "ism": "Робия",
+        "ish_haqi": 6000
+      },
+      {
+        "ism": "Рохат",
+        "ish_haqi": 4000
+      }
+    ],
+    "jami_ish_haqi": 27100,
+    "kassa_topshirildi_sdano": 1600,
+    "kartadan_yechildi": 25500,
+    "karta_avans_va_xarajatlar": [],
+    "savdo_viruchka": 0,
+    "izoh": "28-oktyabr smenasi"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-29",
+    "vaqt": "22:00",
+    "hodimlar": [],
+    "jami_ish_haqi": 0,
+    "kassa_topshirildi_sdano": 0,
+    "kartadan_yechildi": 0,
+    "karta_avans_va_xarajatlar": [
+      {
+        "shaxs": "Сантехник",
+        "turi": "xarajat",
+        "summa": 10000,
+        "izoh": "Сантехник хизмати"
+      }
+    ],
+    "savdo_viruchka": 0,
+    "izoh": "Сантехник"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-30",
+    "vaqt": "22:00",
+    "hodimlar": [],
+    "jami_ish_haqi": 0,
+    "kassa_topshirildi_sdano": 0,
+    "kartadan_yechildi": 0,
+    "karta_avans_va_xarajatlar": [
+      {
+        "shaxs": "Малиш",
+        "turi": "xarajat",
+        "summa": 15000,
+        "izoh": "Малиш / сервис"
+      }
+    ],
+    "savdo_viruchka": 0,
+    "izoh": "Малиш"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-10-31",
+    "vaqt": "22:00",
+    "hodimlar": [],
+    "jami_ish_haqi": 0,
+    "kassa_topshirildi_sdano": 0,
+    "kartadan_yechildi": 0,
+    "karta_avans_va_xarajatlar": [
+      {
+        "shaxs": "Шина 983",
+        "turi": "xarajat",
+        "summa": 17000,
+        "izoh": "Шина 983"
+      }
+    ],
+    "savdo_viruchka": 0,
+    "izoh": "Шина 983"
+  }
+]
