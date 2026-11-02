@@ -428,7 +428,7 @@ def format_fastfood_shift_message(data: dict) -> str:
         for c in card_items:
             text += f"  • {c.get('shaxs', '')}: `{int(c.get('summa', 0)):,}` so'm ({c.get('izoh', '')})\n"
 
-    text += f"\n✅ *Fast Food tabeliga va shaxsiy hisobingizga saqlandi!*"
+    text += f"\n✅ *Fast Food tabeliga saqlandi!*"
     return text
 
 def format_fastfood_tabel_report(summary: dict, title: str = "10 KUNLIK SMENA SARHISOBI") -> str:
@@ -1307,106 +1307,127 @@ def parse_with_smart_rules(text: str) -> dict:
         return None
     lower = text.lower()
 
-    # 1. Fast Food smenasi tekshiruvi
-    ff_keywords = ['нурбек', 'журабек', 'мухмуд', 'мухаммаджон', 'нодира', 'робия', 'рохат', 'сдано', 'снял', 'смена']
-    matches = sum(1 for kw in ff_keywords if kw in lower)
-    if matches >= 2:
-        workers_list = [
-            ('Нурбек', ['нурбек', 'nurbek']),
-            ('Журабек', ['журабек', 'jorabek', "jo'rabek"]),
-            ('Мухмуд', ['мухмуд', 'мухаммаджон', 'mahmud', 'muhammadjon']),
-            ('Нодира', ['нодира', 'nodira']),
-            ('Робия', ['робия', 'robiya']),
-            ('Рохат', ['рохат', 'rohat'])
-        ]
-        found_workers = []
-        for disp_name, aliases in workers_list:
-            for al in aliases:
-                m = re.search(rf'{al}\s*[:=-]?\s*(\d+[\d\s.,]*)', lower)
-                if m:
-                    num_val = int(re.sub(r'[^\d]', '', m.group(1)))
-                    found_workers.append({'ism': disp_name, 'ish_haqi': num_val})
-                    break
+    # 1. Sana aniqlash (29 oktyabr, 30.10, 01.11 yoki 29 kuni)
+    sana = datetime.datetime.now().strftime("%Y-%m-%d")
+    d_m = re.search(r'\b(\d{1,2})[\s.-]*(oktyabr|noyabr|dekabr|октябр|ноябр|декабр|\.10|\.11|\.12)\b', lower)
+    if d_m:
+        day_num = int(d_m.group(1))
+        m_word = d_m.group(2)
+        m_num = 10 if ('okt' in m_word or 'окт' in m_word or '10' in m_word) else (11 if ('noy' in m_word or 'ной' in m_word or '11' in m_word) else 12)
+        sana = f"2026-{m_num:02d}-{day_num:02d}"
+    else:
+        day_only_m = re.search(r'\b(?:число|sana|kuni)\s*(\d{1,2})\b|\b(\d{1,2})[\s-]*(?:число|kuni)\b', lower)
+        if day_only_m:
+            d_val = int(day_only_m.group(1) or day_only_m.group(2))
+            if 1 <= d_val <= 31:
+                cur_ym = sana[:7]
+                sana = f"{cur_ym}-{d_val:02d}"
 
-        sdano_m = re.search(r'(сдано|kassa|topshirildi)\s*[:=-]?\s*(\d+[\d\s.,]*)', lower)
-        sdano = int(re.sub(r'[^\d]', '', sdano_m.group(2))) if sdano_m else 0
+    # 2. Xodimlar ro'yxati (ruscha va o'zbekcha)
+    workers_list = [
+        ("Нурбек", ["нурбек", "нурбик", "nurbek", "nurbik", "nurevika", "nurev"]),
+        ("Журабек", ["журабек", "jorabek", "jo'rabek", "jurabek", "corabek", "corab"]),
+        ("Мухмуд", ["мухмуд", "махмуд", "mahmud", "muhmad", "muhammadjon"]),
+        ("Нодира", ["нодира", "nodira", "nodera", "нодера"]),
+        ("Робия", ["робия", "robiya", "rabia", "рабия", "gobiya"]),
+        ("Рохат", ["рохат", "rohat", "rahat", "рахат"])
+    ]
 
-        snyal_m = re.search(r'(снял|kartadan|yechildi)\s*(с\s*карты)?\s*[:=-]?\s*(\d+[\d\s.,]*)', lower)
-        snyal = int(re.sub(r'[^\d]', '', snyal_m.group(3))) if snyal_m else 0
+    found_workers = []
+    for disp_name, aliases in workers_list:
+        for al in aliases:
+            m = re.search(rf'{al}\s*[:=-]?\s*(\d+[\d\s.,]*)', lower)
+            if m:
+                num_val = int(re.sub(r'[^\d]', '', m.group(1)))
+                if num_val < 100:
+                    num_val *= 100
+                found_workers.append({'ism': disp_name, 'ish_haqi': num_val, 'lavozim': "bo'sh", 'soat': None})
+                break
 
+    # Сдано (касса topshirildi)
+    sdano_m = re.search(r'(?:сдано|сдал|sdano|kassa|касса|topshirildi)\s*[:=-]?\s*(\d+[\d\s.,]*)', lower)
+    sdano = int(re.sub(r'[^\d]', '', sdano_m.group(1))) if sdano_m else 0
+
+    # Снял с карты
+    snyal_m = re.search(r'(?:снял\s*с\s*карты|снял|kartadan\s*yechildi|kartadan|yechildi|snyal)\s*[:=-]?\s*(\d+[\d\s.,]*)', lower)
+    snyal = int(re.sub(r'[^\d]', '', snyal_m.group(1))) if snyal_m else 0
+
+    # Savdo (выручка)
+    savdo_m = re.search(r'(?:выручка|viruchka|savdo|савдо)\s*[:=-]?\s*(\d+[\d\s.,]*)', lower)
+    savdo = int(re.sub(r'[^\d]', '', savdo_m.group(1))) if savdo_m else 0
+
+    # Karta+ xarajatlari
+    karta_expenses = []
+    karta_special = [
+        ("Сантехник", ["сантехник", "santexnik"]),
+        ("Малиш", ["малиш", "malish"]),
+        ("Шина 983", ["шина 983", "шина", "shina 983", "shina", "балон", "balon"]),
+        ("Блогер", ["блогер", "bloger"]),
+        ("Страховка", ["страховка", "страхов", "straxov"]),
+        ("Холод", ["холод", "xolod", "холодильник"])
+    ]
+    for exp_name, exp_aliases in karta_special:
+        for al in exp_aliases:
+            m = re.search(rf'{al}\s*[:=-]?\s*(\d+[\d\s.,]*)', lower)
+            if m:
+                sum_val = int(re.sub(r'[^\d]', '', m.group(1)))
+                if sum_val < 100:
+                    sum_val *= 1000
+                karta_expenses.append({'shaxs': exp_name, 'summa': sum_val, 'turi': 'xarajat', 'izoh': exp_name})
+                break
+
+    if found_workers or sdano > 0 or snyal > 0 or savdo > 0 or karta_expenses:
         zp = sum(w['ish_haqi'] for w in found_workers)
-        if found_workers or sdano > 0 or snyal > 0:
-            return {
-                "is_fastfood_smena": True,
-                "hodimlar": found_workers,
-                "jami_ish_haqi": zp,
-                "kassa_topshirildi_sdano": sdano,
-                "kartadan_yechildi": snyal,
-                "karta_avans_va_xarajatlar": [],
-                "savdo_viruchka": 0,
-                "izoh": "Kunlik smena",
-                "toza_matn": text
-            }
+        return {
+            'is_fastfood_smena': True,
+            'sana': sana,
+            'vaqt': datetime.datetime.now().strftime("%H:%M"),
+            'hodimlar': found_workers,
+            'jami_ish_haqi': zp,
+            'kassa_topshirildi_sdano': sdano,
+            'kartadan_yechildi': snyal,
+            'savdo_viruchka': savdo,
+            'karta_avans_va_xarajatlar': karta_expenses,
+            'izoh': "Kunlik smena",
+            'toza_matn': text
+        }
 
-    # 2. Standart xarajat/tushum/qarz tekshiruvi
+    # Raqamlar bo'lsa umumiy xarajat yoki kassa deb qabul qilamiz
     nums = re.findall(r'\b\d+[\d\s.,]*\b', text)
-    summa = 0
     if nums:
         cleaned_nums = [int(re.sub(r'[^\d]', '', n)) for n in nums if re.sub(r'[^\d]', '', n)]
         if cleaned_nums:
-            summa = max(cleaned_nums)
-            if 'ming' in lower and summa < 10000:
-                summa *= 1000
-            elif ('mln' in lower or 'million' in lower) and summa < 1000:
-                summa *= 1000000
-
-    if summa > 0:
-        if any(w in lower for w in ['qarz berdim', 'nasiya berdim', 'berdim']):
-            return {
-                "turi": "Nasiya berildi",
-                "shaxs": "Mijoz",
-                "tushum_som": 0,
-                "xarajat_som": 0,
-                "nasiya_som": summa,
-                "kategoriya": "Qarz munosabatlari",
-                "izoh": text,
-                "toza_matn": text,
-                "qaytarish_sanasi": None
-            }
-        elif any(w in lower for w in ['qarz qaytdi', 'nasiya qaytdi', 'qaytardi']):
-            return {
-                "turi": "Nasiya qaytdi",
-                "shaxs": "Mijoz",
-                "tushum_som": 0,
-                "xarajat_som": 0,
-                "nasiya_som": summa,
-                "kategoriya": "Qarz munosabatlari",
-                "izoh": text,
-                "toza_matn": text,
-                "qaytarish_sanasi": None
-            }
-        elif any(w in lower for w in ['tushum', 'daromad', 'foyda', 'oldi']):
-            return {
-                "turi": "Tushum",
-                "shaxs": "",
-                "tushum_som": summa,
-                "xarajat_som": 0,
-                "nasiya_som": 0,
-                "kategoriya": "Savdo",
-                "izoh": text,
-                "toza_matn": text
-            }
-        else:
-            return {
-                "turi": "Xarajat",
-                "shaxs": "",
-                "tushum_som": 0,
-                "xarajat_som": summa,
-                "nasiya_som": 0,
-                "kategoriya": "Boshqa",
-                "izoh": text,
-                "toza_matn": text
-            }
+            max_sum = max(cleaned_nums)
+            if 'ming' in lower and max_sum < 10000:
+                max_sum *= 1000
+            if any(w in lower for w in ['kassa', 'касса', 'tushum', 'daromad']):
+                return {
+                    'is_fastfood_smena': True,
+                    'sana': sana,
+                    'vaqt': datetime.datetime.now().strftime("%H:%M"),
+                    'hodimlar': [],
+                    'jami_ish_haqi': 0,
+                    'kassa_topshirildi_sdano': max_sum,
+                    'kartadan_yechildi': 0,
+                    'savdo_viruchka': 0,
+                    'karta_avans_va_xarajatlar': [],
+                    'izoh': text,
+                    'toza_matn': text
+                }
+            else:
+                return {
+                    'is_fastfood_smena': True,
+                    'sana': sana,
+                    'vaqt': datetime.datetime.now().strftime("%H:%M"),
+                    'hodimlar': [],
+                    'jami_ish_haqi': 0,
+                    'kassa_topshirildi_sdano': 0,
+                    'kartadan_yechildi': 0,
+                    'savdo_viruchka': 0,
+                    'karta_avans_va_xarajatlar': [{'shaxs': text[:30], 'summa': max_sum, 'turi': 'xarajat', 'izoh': text}],
+                    'izoh': text,
+                    'toza_matn': text
+                }
 
     return None
 
@@ -1572,32 +1593,26 @@ def get_user_webapp_url(user_id=None) -> str:
     return f"{base}?user_id={uid}"
 
 def get_action_keyboard(user_id=None):
-    url = get_user_webapp_url(user_id)
     keyboard = [
         [
-            InlineKeyboardButton("🌐 Moliya & Qarz Web Ilovasi", web_app=WebAppInfo(url=url)),
+            InlineKeyboardButton("📅 1-Dekada (1-10)", callback_data="ff_dek_1"),
+            InlineKeyboardButton("📅 2-Dekada (11-20)", callback_data="ff_dek_2"),
         ],
         [
-            InlineKeyboardButton("🍔 Fast Food Tabel", callback_data="ff_dek_1"),
-            InlineKeyboardButton("⏰ Kunlik Hisobot", callback_data="daily_digest"),
+            InlineKeyboardButton("📅 3-Dekada (21-31)", callback_data="ff_dek_3"),
+            InlineKeyboardButton("📊 To'liq Oy", callback_data="ff_month_full"),
         ],
         [
-            InlineKeyboardButton("📈 Kategoriya Hisoboti", callback_data="category_report"),
-            InlineKeyboardButton("📋 Yozuvlar", callback_data="show_rows_list"),
-        ],
-        [
-            InlineKeyboardButton("📊 Excel Faylini Yuklash", callback_data="download_excel")
+            InlineKeyboardButton("📥 Excel Yuklash (.xlsx)", callback_data="download_excel"),
+            InlineKeyboardButton("🗑 Smenani o'chirish", callback_data="ff_delete_menu")
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
 
 def get_reply_menu(user_id=None):
-    url = get_user_webapp_url(user_id)
     keyboard = [
-        [KeyboardButton("🌐 Moliya & Qarz Ilovasi", web_app=WebAppInfo(url=url))],
-        [KeyboardButton("🍔 Fast Food Tabel"), KeyboardButton("⏰ Kunlik Hisobot (Daily Digest)")],
-        [KeyboardButton("📈 Kategoriyalar Hisoboti"), KeyboardButton("📋 Yozuvlarni ko'rish va o'chirish")],
-        [KeyboardButton("📊 Excel Jadvalini Yuklash (.xlsx)"), KeyboardButton("ℹ️ Yordam")]
+        [KeyboardButton("🍔 Fast Food Tabel"), KeyboardButton("📊 Excel Jadvalini Yuklash (.xlsx)")],
+        [KeyboardButton("🗑 Smenani o'chirish"), KeyboardButton("ℹ️ Yordam")]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
@@ -1692,132 +1707,29 @@ async def send_category_report(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text(report, parse_mode="Markdown", reply_markup=get_action_keyboard())
 
 def generate_daily_digest(target_date: str = None, user_id=None) -> str:
-    """Bugungi (yoki berilgan sanadagi) moliyaviy aylanma va qarzlar bo'yicha to'liq hisobot"""
+    """Bugungi kungi Fast Food smenasi va oylik kassa sarhisobi"""
     now = datetime.datetime.now()
     if not target_date:
         target_date = now.strftime("%Y-%m-%d")
 
-    rows = get_all_rows(user_id=user_id)
-    today_rows = [r for r in rows if r.get("sana") == target_date]
+    smenas = load_fastfood_smenas(user_id=user_id)
+    today_smena = next((s for s in smenas if s.get("sana") == target_date), None)
 
-    tushum_bugun = 0
-    xarajat_bugun = 0
-    nasiya_berildi_bugun = 0
-    nasiya_qaytdi_bugun = 0
-    faol_mijozlar = set()
-
-    for r in today_rows:
-        turi = (r.get("turi") or "").lower()
-        izoh = (r.get("izoh") or "").lower()
-        shaxs = (r.get("shaxs") or "").strip()
-        if shaxs and shaxs != "Noma'lum":
-            faol_mijozlar.add(shaxs)
-
-        t_sum = r.get("tushum") or 0
-        x_sum = r.get("xarajat") or 0
-        n_sum = r.get("nasiya") or 0
-
-        if "tushum" in turi:
-            tushum_bugun += t_sum
-        elif "xarajat" in turi:
-            xarajat_bugun += x_sum
-        elif "qaytdi" in turi or "qaytardi" in izoh or "yopdi" in izoh:
-            nasiya_qaytdi_bugun += (n_sum if n_sum > 0 else t_sum)
-        elif "berildi" in turi or "nasiya" in turi or n_sum > 0:
-            nasiya_berildi_bugun += n_sum
-
-    # Qarzdorlar muddatlarini tekshirish
-    reminders = load_debt_reminders()
-    tomorrow_str = (now + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
-
-    overdue_debts = []
-    due_today_debts = []
-    due_tomorrow_debts = []
-
-    for item in reminders:
-        shaxs = item.get("shaxs")
-        due = item.get("qaytarish_sanasi")
-        if not due or not shaxs:
-            continue
-        debt_info = calculate_person_debt_balance(shaxs)
-        qoldiq = debt_info["qoldiq"]
-        if qoldiq <= 0:
-            continue
-
-        d_entry = {
-            "shaxs": shaxs,
-            "telefon": item.get("telefon", ""),
-            "qoldiq": qoldiq,
-            "due": due
-        }
-
-        if due < target_date:
-            overdue_debts.append(d_entry)
-        elif due == target_date:
-            due_today_debts.append(d_entry)
-        elif due == tomorrow_str:
-            due_tomorrow_debts.append(d_entry)
-
-    # Sana formatlash
     parts = target_date.split("-")
     year_num = parts[0]
-    month_key = parts[1] if len(parts) > 1 else "01"
+    month_key = parts[1] if len(parts) > 1 else "10"
     day_num = parts[2] if len(parts) > 2 else "01"
     month_name = MONTH_NAMES_UZ.get(month_key, "")
 
-    text = f"⏰ **KUNLIK MOLIYAVIY HISOBOT (DAILY DIGEST)**\n"
+    text = f"⏰ **KUNLIK FAST FOOD HISOBOTI (DAILY DIGEST)**\n"
     text += f"📅 **Sana:** `{day_num}-{month_name} {year_num}-yil`\n"
     text += f"━━━━━━━━━━━━━━━━━━━━━━\n\n"
 
-    text += f"💰 **BUGUNGI AYLANMA KO'RSATKICHLARI:**\n"
-    text += f"🟢 **Bugungi Tushum:** `{tushum_bugun:,} so'm`\n"
-    text += f"🔴 **Bugungi Xarajat:** `{xarajat_bugun:,} so'm`\n"
-    if nasiya_qaytdi_bugun > 0:
-        text += f"✅ **Qaytarilgan qarzlar:** `{nasiya_qaytdi_bugun:,} so'm`\n"
-    if nasiya_berildi_bugun > 0:
-        text += f"⚠️ **Yangi berilgan qarzlar:** `{nasiya_berildi_bugun:,} so'm`\n"
-
-    sof_kunlik = tushum_bugun - xarajat_bugun
-    sof_sign = "+" if sof_kunlik >= 0 else ""
-    text += f"📈 **Bugungi sof o'zgarish:** `{sof_sign}{sof_kunlik:,} so'm`\n"
-    text += f"📝 **Bugungi operatsiyalar:** {len(today_rows)} ta yozuv\n\n"
-
-    if faol_mijozlar:
-        mijozlar_str = ", ".join(sorted(list(faol_mijozlar)))
-        text += f"👥 **Bugungi faol mijozlar:** {mijozlar_str}\n\n"
-
-    # Muddatlar
-    if due_today_debts or due_tomorrow_debts or overdue_debts:
-        text += f"🔔 **QARZLAR VA MUDDATLAR NAZORATI:**\n"
-        if due_today_debts:
-            text += f"🚨 **Bugun qaytarish kuni:**\n"
-            for d in due_today_debts:
-                tel = f" ({d['telefon']})" if d['telefon'] else ""
-                text += f"  • `{d['shaxs']}`{tel} — **{d['qoldiq']:,} so'm**\n"
-        if due_tomorrow_debts:
-            text += f"⏰ **Ertaga muddati keladigan:**\n"
-            for d in due_tomorrow_debts:
-                tel = f" ({d['telefon']})" if d['telefon'] else ""
-                text += f"  • `{d['shaxs']}`{tel} — **{d['qoldiq']:,} so'm**\n"
-        if overdue_debts:
-            text += f"⚠️ **Muddati o'tib ketgan qarzlar ({len(overdue_debts)} ta):**\n"
-            for d in overdue_debts[:5]:
-                tel = f" ({d['telefon']})" if d['telefon'] else ""
-                text += f"  • `{d['shaxs']}`{tel} — **{d['qoldiq']:,} so'm** (muddat: {d['due']})\n"
-        text += "\n"
-
-    # Oylik jami
-    month_prefix = f"{year_num}-{month_key}"
-    m_stats = get_category_totals(target_month_prefix=month_prefix, user_id=user_id)
-    m_profit = m_stats.get('sof_foyda', 0)
-    m_sign = "+" if m_profit >= 0 else ""
-
-    text += f"━━━━━━━━━━━━━━━━━━━━━━\n"
-    text += f"📊 **{month_name.upper()} OYI UMUMIY BALANSI:**\n"
-    text += f"• Oylik jami tushum: `{m_stats.get('total_tushum', 0):,} so'm`\n"
-    text += f"• Oylik jami xarajat: `{m_stats.get('total_xarajat', 0):,} so'm`\n"
-    text += f"• Oylik sof foyda: `{m_sign}{m_profit:,} so'm`\n\n"
-    text += f"👉 *Mijozlar profili va qarzlar boshqaruvi uchun Web App ilovadan foydalaning!*"
+    if today_smena:
+        text += format_fastfood_shift_message(today_smena)
+    else:
+        text += f"⚠️ **Bugun (`{target_date}`) hali smena yozuvlari kiritilmadi.**\n\n"
+        text += "👉 *Smenani kiritish uchun botga ovozli xabar (golosovoy) yuboring!*"
 
     return text
 
@@ -1882,17 +1794,23 @@ async def daily_digest_scheduler_task(app):
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
+    user_id = update.effective_user.id if update.effective_user else chat_id
     add_subscriber(chat_id)
+    try:
+        from telegram import MenuButtonCommands
+        await context.bot.set_chat_menu_button(chat_id=chat_id, menu_button=MenuButtonCommands())
+    except Exception as me_err:
+        pass
+
     welcome = (
         "👋 Assalomu alaykum!\n\n"
-        "Men sizning **Professional Moliya & AI Yordamchingizman**.\n\n"
-        "🎙 Menga **ovozli xabar (golosovoy)** yuboring yoki matn ko'rinishida yozing:\n"
-        "👉 *\"Dastur uchun to'rt yuz sakson ming so'm to'lov qildim\"*\n"
-        "👉 *\"Bugun Doniyorga 200 ming so'm qarz berdim, juma kuni qaytaradi\"*\n\n"
-        "✨ **ASOSIY IMKONIYATLAR:**\n"
-        "📱 **Moliya Web Ilovasi (Mini-CRM):** Pastdagi tugma orqali mijozlar profili, aylanmasi va qarzlarini ko'ring.\n"
-        "⏰ **Kunlik Hisobot (Daily Digest):** Har kuni kechqurun avtomatik kassa va qarzlar sarhisobi.\n"
-        "📥 **Excel Yuklash:** Istalgan vaqt jadvalni to'liq yuklab oling."
+        "Men sizning **Fast Food Xodimlar Tabeli & Kassa Hisoboti** yordamchingizman 🍔\n\n"
+        "🎙 Menga xodimlar oyligi va kassa hisobotini **ovozli xabar (golosovoy)** yoki matn ko'rinishida yuboring:\n"
+        "👉 Masalan:\n"
+        "• *\"Нурбек 8500, Журабек 8500, Сдано 10000, Снял с карты 17000\"*\n"
+        "• *\"Нурбек 8500\"*\n"
+        "• *\"Сантехник 10000\"*\n\n"
+        "✨ Barcha yozuvlar avtomatik tarzda **Fast Food Excel Tabeli**ga tushadi!"
     )
     await update.message.reply_text(welcome, parse_mode="Markdown", reply_markup=get_reply_menu())
 
@@ -2127,26 +2045,20 @@ async def handle_text_or_voice(update: Update, context: ContextTypes.DEFAULT_TYP
                 await msg.reply_text(f"❌ Kalitni tekshirishda xatolik: {test_err}")
                 return
 
-    if text_input in ("📊 Excel Jadvalini Yuklash (.xlsx)", "📊 Jadvalni yuklab olish (Excel)", "/jadval"):
+    if text_input in ("📊 Excel Jadvalini Yuklash (.xlsx)", "📊 Jadvalni yuklab olish (Excel)", "/jadval", "/excel"):
         await send_excel_file(update, context)
-        return
-    elif text_input in ("📈 Kategoriyalar Hisoboti", "/hisobot", "/statistika"):
-        await send_category_report(update, context)
-        return
-    elif text_input in ("⏰ Kunlik Hisobot (Daily Digest)", "⏰ Kunlik Hisobot", "/kunlik", "/digest", "/kunlik_hisobot"):
-        await send_daily_digest(update, context)
         return
     elif text_input in ("🍔 Fast Food Tabel", "Fast Food Tabel", "/tabel", "/smena"):
         await send_fastfood_tabel(update, context, start_day=1, end_day=10, title="1-Dekada (1-10 kun)")
         return
-    elif text_input in ("📋 Yozuvlarni ko'rish va o'chirish", "/royxat", "/yozuvlar"):
-        await send_rows_list(update, context)
+    elif text_input in ("🗑 Smenani o'chirish", "Smenani o'chirish", "/ochirish", "/bekor"):
+        await send_fastfood_delete_menu(update, context)
         return
-    elif text_input.startswith(("/ochirish", "/bekor")):
-        await handle_delete_command(update, context)
-        return
-    elif text_input == "ℹ️ Yordam":
+    elif text_input in ("ℹ️ Yordam", "Yordam", "/help", "/start"):
         await start_command(update, context)
+        return
+    elif text_input in ("⏰ Kunlik Hisobot (Daily Digest)", "⏰ Kunlik Hisobot", "/kunlik", "/digest"):
+        await send_daily_digest(update, context)
         return
 
     await context.bot.send_chat_action(msg.chat.id, ChatAction.TYPING)
@@ -2212,99 +2124,77 @@ async def handle_text_or_voice(update: Update, context: ContextTypes.DEFAULT_TYP
                 await msg.reply_text(f"❌ Ovozni tanishda xatolik yuz berdi: {w_err}\nIltimos, qayta yuboring yoki matn sifatida yozing.")
                 return
 
-        res = await parse_note_with_ai(text=text_input, audio_b64=audio_b64)
+                res = await parse_note_with_ai(text=text_input, audio_b64=audio_b64)
+        if not res:
+            res = {
+                "is_fastfood_smena": True,
+                "sana": datetime.datetime.now().strftime("%Y-%m-%d"),
+                "vaqt": datetime.datetime.now().strftime("%H:%M"),
+                "hodimlar": [],
+                "jami_ish_haqi": 0,
+                "kassa_topshirildi_sdano": 0,
+                "kartadan_yechildi": 0,
+                "savdo_viruchka": 0,
+                "karta_avans_va_xarajatlar": [],
+                "izoh": text_input,
+                "toza_matn": text_input
+            }
+        else:
+            res["is_fastfood_smena"] = True
 
-        # REJIM 1: FAST FOOD SMENASI
-        if res.get("is_fastfood_smena"):
-            smenas = load_fastfood_smenas(user_id=user_id)
+        # Smenani mavjud smenalar bilan aqlli birlashtiramiz (Merge)
+        smenas = load_fastfood_smenas(user_id=user_id)
+        s_date = res.get("sana") or datetime.datetime.now().strftime("%Y-%m-%d")
+        res["sana"] = s_date
+        
+        existing_idx = None
+        for idx, s in enumerate(smenas):
+            if s.get("sana") == s_date:
+                existing_idx = idx
+                break
+
+        if existing_idx is not None:
+            existing = smenas[existing_idx]
+            # Xodimlarni yangilash / qo'shish
+            w_dict = {w["ism"]: w for w in existing.get("hodimlar", [])}
+            for w in res.get("hodimlar", []):
+                w_dict[w["ism"]] = w
+            existing["hodimlar"] = list(w_dict.values())
+            existing["jami_ish_haqi"] = sum(w.get("ish_haqi", 0) for w in existing["hodimlar"])
+
+            if res.get("kassa_topshirildi_sdano", 0) > 0:
+                existing["kassa_topshirildi_sdano"] = res["kassa_topshirildi_sdano"]
+            if res.get("kartadan_yechildi", 0) > 0:
+                existing["kartadan_yechildi"] = res["kartadan_yechildi"]
+            if res.get("savdo_viruchka", 0) > 0:
+                existing["savdo_viruchka"] = res["savdo_viruchka"]
+
+            k_list = existing.get("karta_avans_va_xarajatlar", [])
+            for k in res.get("karta_avans_va_xarajatlar", []):
+                k_list.append(k)
+            existing["karta_avans_va_xarajatlar"] = k_list
+            res = existing
+            smenas[existing_idx] = existing
+        else:
             smenas.append(res)
-            save_fastfood_smenas(smenas, user_id=user_id)
 
-            try:
-                append_fastfood_smena_to_excel(res, user_id=user_id)
-            except Exception as ex_err:
-                logger.error(f"Excel smena saqlash xatosi: {ex_err}")
+        save_fastfood_smenas(smenas, user_id=user_id)
 
-            await wait_msg.delete()
-
-            reply_text = format_fastfood_shift_message(res)
-            ff_kb = [
-                [
-                    InlineKeyboardButton("📅 1-Dekada (1-10)", callback_data="ff_dek_1"),
-                    InlineKeyboardButton("📅 2-Dekada (11-20)", callback_data="ff_dek_2"),
-                ],
-                [
-                    InlineKeyboardButton("📅 3-Dekada (21-31)", callback_data="ff_dek_3"),
-                    InlineKeyboardButton("📊 To'liq Oy", callback_data="ff_month_full"),
-                ],
-                [
-                    InlineKeyboardButton("🌐 Fast Food WebApp", web_app=WebAppInfo(url=f"{get_user_webapp_url(user_id)}&tab=fastfood")),
-                    InlineKeyboardButton("📊 Excel Yuklash", callback_data="download_excel")
-                ]
-            ]
-            await msg.reply_text(
-                reply_text,
-                parse_mode="Markdown",
-                reply_markup=InlineKeyboardMarkup(ff_kb)
-            )
-            return
-
-        # REJIM 2: STANDART MOLIYA AMALI
-        append_to_excel_and_csv(res, user_id=user_id)
-
-        # Agar qarz berilgan bo'lsa va qaytarish sanasi ko'rsatilgan bo'lsa, eslatmalar ro'yxatiga saqlaymiz
-        qaytarish_sanasi = res.get("qaytarish_sanasi")
-        if qaytarish_sanasi and ("nasiya" in str(res.get("turi", "")).lower() or "berildi" in str(res.get("turi", "")).lower()):
-            reminders = load_debt_reminders(user_id=user_id)
-            reminders.append({
-                "chat_id": user_id,
-                "shaxs": res.get("shaxs", "Noma'lum"),
-                "telefon": res.get("telefon", ""),
-                "boshlangich_qarz": int(res.get("nasiya_som", 0)),
-                "berilgan_sana": res.get("sana"),
-                "qaytarish_sanasi": qaytarish_sanasi,
-                "izoh": res.get("izoh"),
-                "ogohlantirildi": False
-            })
-            save_debt_reminders(reminders, user_id=user_id)
-            logger.info(f"⏰ Qarz eslatmasi saqlandi ({user_id}): {res.get('shaxs')} -> {qaytarish_sanasi}")
+        try:
+            from tabel_sync import sync_fastfood_tabel_file
+            sync_fastfood_tabel_file(user_id=user_id)
+        except Exception as ex_err:
+            logger.error(f"Excel sinxronizatsiya xatosi: {ex_err}")
 
         await wait_msg.delete()
 
-        month_label = get_month_sheet_title(res.get('sana', ''))
-
-        display_text = res.get("toza_matn") or clean_stt_noise(text_input)
-
-        reply_text = (
-            f"✅ **Excel jadvalingizning '{month_label}' varag'iga saqlandi!** 📊\n"
-            f"*(Ushbu oyning Kategoriya Hisoboti o'ng tomonga alohida joylandi)*\n\n"
-            f"🗣 **Eshitilgan xabar:** *\"{display_text}\"*\n\n"
-            f"📅 **Sana:** `{res.get('sana')}` ({res.get('vaqt')})\n"
-            f"📌 **Turi:** {res.get('turi')}\n"
-            f"👤 **Shaxs/Mijoz:** {res.get('shaxs')}\n"
-        )
-
-        if res.get("telefon"):
-            reply_text += f"📞 **Telefon:** `{res.get('telefon')}`\n"
-
-        reply_text += (
-            f"💰 **Tushum:** {int(res.get('tushum_som', 0)):,} so'm\n"
-            f"💸 **Xarajat:** {int(res.get('xarajat_som', 0)):,} so'm\n"
-            f"⏳ **Nasiya:** {int(res.get('nasiya_som', 0)):,} so'm\n"
-        )
-
-        if qaytarish_sanasi:
-            reply_text += f"⏰ **Qaytarish muddati:** `{qaytarish_sanasi}` (Eslatib turiladi!)\n"
-
-        reply_text += (
-            f"🏷 **Kategoriya:** {res.get('kategoriya')}\n"
-            f"📝 **Izoh:** {res.get('izoh')}"
-        )
+        reply_text = format_fastfood_shift_message(res)
         await msg.reply_text(
             reply_text,
             parse_mode="Markdown",
-            reply_markup=get_action_keyboard(user_id=user_id)
+            reply_markup=get_action_keyboard(user_id)
         )
+        return
 
     except Exception as e:
         logger.error(f"Xato: {e}")
