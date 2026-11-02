@@ -1307,27 +1307,53 @@ def parse_with_smart_rules(text: str) -> dict:
         return None
     lower = text.lower()
 
-    # 1. Sana aniqlash (29 oktyabr, 30.10, 01.11 yoki 29 kuni)
-    sana = datetime.datetime.now().strftime("%Y-%m-%d")
-    d_m = re.search(r'\b(\d{1,2})[\s.-]*(oktyabr|noyabr|dekabr|октябр|ноябр|декабр|\.10|\.11|\.12)\b', lower)
-    if d_m:
-        day_num = int(d_m.group(1))
-        m_word = d_m.group(2)
-        m_num = 10 if ('okt' in m_word or 'окт' in m_word or '10' in m_word) else (11 if ('noy' in m_word or 'ной' in m_word or '11' in m_word) else 12)
-        sana = f"2026-{m_num:02d}-{day_num:02d}"
-    else:
-        day_only_m = re.search(r'\b(?:число|sana|kuni)\s*(\d{1,2})\b|\b(\d{1,2})[\s-]*(?:число|kuni)\b', lower)
-        if day_only_m:
-            d_val = int(day_only_m.group(1) or day_only_m.group(2))
-            if 1 <= d_val <= 31:
-                cur_ym = sana[:7]
-                sana = f"{cur_ym}-{d_val:02d}"
+    # 1. Sana aniqlash (Toshkent vaqti UTC+5)
+    tz_tashkent = datetime.timezone(datetime.timedelta(hours=5))
+    now_tashkent = datetime.datetime.now(tz_tashkent)
+    sana = now_tashkent.strftime("%Y-%m-%d")
 
-    # 2. Xodimlar ro'yxati (ruscha va o'zbekcha)
+    # Kecha so'zi bo'lsa
+    if "kecha" in lower or "вчера" in lower:
+        sana = (now_tashkent - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+    else:
+        d_m = re.search(r'\b(\d{1,2})[\s.-]*(oktyabr|noyabr|dekabr|yanvar|fevral|mart|aprel|may|iyun|iyul|avgust|sentabr|октябр|ноябр|декабр|январ|феврал|март|апрел|май|июн|июл|август|сентабр|\.01|\.02|\.03|\.04|\.05|\.06|\.07|\.08|\.09|\.10|\.11|\.12)\b', lower)
+        if d_m:
+            day_num = int(d_m.group(1))
+            m_word = d_m.group(2)
+            month_map = {
+                "01": 1, "yan": 1, "янв": 1,
+                "02": 2, "fev": 2, "фев": 2,
+                "03": 3, "mar": 3, "мар": 3,
+                "04": 4, "apr": 4, "апр": 4,
+                "05": 5, "may": 5, "май": 5,
+                "06": 6, "iyun": 6, "июн": 6,
+                "07": 7, "iyul": 7, "июл": 7,
+                "08": 8, "avg": 8, "авг": 8,
+                "09": 9, "sen": 9, "сен": 9,
+                "10": 10, "okt": 10, "окт": 10,
+                "11": 11, "noy": 11, "ной": 11,
+                "12": 12, "dek": 12, "дек": 12
+            }
+            m_num = now_tashkent.month
+            for k, v in month_map.items():
+                if k in m_word:
+                    m_num = v
+                    break
+            sana = f"{now_tashkent.year}-{m_num:02d}-{day_num:02d}"
+        else:
+            day_only_m = re.search(r'\b(?:число|sana|kuni)\s*(\d{1,2})\b|\b(\d{1,2})[\s-]*(?:число|kuni)\b', lower)
+            if day_only_m:
+                d_val = int(day_only_m.group(1) or day_only_m.group(2))
+                if 1 <= d_val <= 31:
+                    cur_ym = sana[:7]
+                    sana = f"{cur_ym}-{d_val:02d}"
+
+    # 2. Xodimlar ro'yxati (o'zbekcha va ruscha qo'shimchalar bilan: -ga, -ka, -ning, -ни...)
+    suffixes = r'(?:ga|ka|ge|ke|ning|ni|га|ка|нинг|ни|а|у)?'
     workers_list = [
-        ("Нурбек", ["нурбек", "нурбик", "nurbek", "nurbik", "nurevika", "nurev"]),
-        ("Журабек", ["журабек", "jorabek", "jo'rabek", "jurabek", "corabek", "corab"]),
-        ("Мухмуд", ["мухмуд", "махмуд", "mahmud", "muhmad", "muhammadjon"]),
+        ("Нурбек", ["нурбек", "нурбик", "nurbek", "nurbik", "nurevika", "nurev", "nurbeg"]),
+        ("Журабек", ["журабек", "jorabek", "jo'rabek", "jurabek", "corabek", "corab", "jora", "jo'ra", "жура"]),
+        ("Мухмуд", ["мухмуд", "махмуд", "mahmud", "muhmad", "muhammadjon", "maxmud", "маxмуд"]),
         ("Нодира", ["нодира", "nodira", "nodera", "нодера"]),
         ("Робия", ["робия", "robiya", "rabia", "рабия", "gobiya"]),
         ("Рохат", ["рохат", "rohat", "rahat", "рахат"])
@@ -1336,52 +1362,58 @@ def parse_with_smart_rules(text: str) -> dict:
     found_workers = []
     for disp_name, aliases in workers_list:
         for al in aliases:
-            m = re.search(rf'{al}\s*[:=-]?\s*(\d+[\d\s.,]*)', lower)
+            pattern = rf'{al}{suffixes}[^\d\n]*?(\d+[\d\s.,]*)'
+            m = re.search(pattern, lower)
             if m:
-                num_val = int(re.sub(r'[^\d]', '', m.group(1)))
-                if num_val < 100:
-                    num_val *= 100
-                found_workers.append({'ism': disp_name, 'ish_haqi': num_val, 'lavozim': "bo'sh", 'soat': None})
-                break
+                raw_str = re.sub(r'[^\d]', '', m.group(1))
+                if raw_str:
+                    num_val = int(raw_str)
+                    if num_val < 100:
+                        num_val *= 100
+                    found_workers.append({'ism': disp_name, 'ish_haqi': num_val, 'lavozim': "bo'sh", 'soat': None})
+                    break
 
     # Сдано (касса topshirildi)
-    sdano_m = re.search(r'(?:сдано|сдал|sdano|kassa|касса|topshirildi)\s*[:=-]?\s*(\d+[\d\s.,]*)', lower)
-    sdano = int(re.sub(r'[^\d]', '', sdano_m.group(1))) if sdano_m else 0
+    sdano_m = re.search(r'(?:сдано|сдал|sdano|kassa|касса|topshirildi)[^\d\n]*?(\d+[\d\s.,]*)', lower)
+    sdano = int(re.sub(r'[^\d]', '', sdano_m.group(1))) if sdano_m and re.sub(r'[^\d]', '', sdano_m.group(1)) else 0
 
     # Снял с карты
-    snyal_m = re.search(r'(?:снял\s*с\s*карты|снял|kartadan\s*yechildi|kartadan|yechildi|snyal)\s*[:=-]?\s*(\d+[\d\s.,]*)', lower)
-    snyal = int(re.sub(r'[^\d]', '', snyal_m.group(1))) if snyal_m else 0
+    snyal_m = re.search(r'(?:снял\s*с\s*карты|снял|kartadan\s*yechildi|kartadan|yechildi|snyal)[^\d\n]*?(\d+[\d\s.,]*)', lower)
+    snyal = int(re.sub(r'[^\d]', '', snyal_m.group(1))) if snyal_m and re.sub(r'[^\d]', '', snyal_m.group(1)) else 0
 
     # Savdo (выручка)
-    savdo_m = re.search(r'(?:выручка|viruchka|savdo|савдо)\s*[:=-]?\s*(\d+[\d\s.,]*)', lower)
-    savdo = int(re.sub(r'[^\d]', '', savdo_m.group(1))) if savdo_m else 0
+    savdo_m = re.search(r'(?:выручка|viruchka|savdo|савдо)[^\d\n]*?(\d+[\d\s.,]*)', lower)
+    savdo = int(re.sub(r'[^\d]', '', savdo_m.group(1))) if savdo_m and re.sub(r'[^\d]', '', savdo_m.group(1)) else 0
 
     # Karta+ xarajatlari
     karta_expenses = []
     karta_special = [
-        ("Сантехник", ["сантехник", "santexnik"]),
+        ("Сантехник", ["сантехник", "santexnik", "santex"]),
         ("Малиш", ["малиш", "malish"]),
         ("Шина 983", ["шина 983", "шина", "shina 983", "shina", "балон", "balon"]),
         ("Блогер", ["блогер", "bloger"]),
         ("Страховка", ["страховка", "страхов", "straxov"]),
-        ("Холод", ["холод", "xolod", "холодильник"])
+        ("Холод", ["холод", "xolod", "холодильник", "xolodilnik"])
     ]
     for exp_name, exp_aliases in karta_special:
         for al in exp_aliases:
-            m = re.search(rf'{al}\s*[:=-]?\s*(\d+[\d\s.,]*)', lower)
+            pattern = rf'{al}{suffixes}[^\d\n]*?(\d+[\d\s.,]*)'
+            m = re.search(pattern, lower)
             if m:
-                sum_val = int(re.sub(r'[^\d]', '', m.group(1)))
-                if sum_val < 100:
-                    sum_val *= 1000
-                karta_expenses.append({'shaxs': exp_name, 'summa': sum_val, 'turi': 'xarajat', 'izoh': exp_name})
-                break
+                raw_exp = re.sub(r'[^\d]', '', m.group(1))
+                if raw_exp:
+                    sum_val = int(raw_exp)
+                    if sum_val < 100:
+                        sum_val *= 1000
+                    karta_expenses.append({'shaxs': exp_name, 'summa': sum_val, 'turi': 'xarajat', 'izoh': exp_name})
+                    break
 
     if found_workers or sdano > 0 or snyal > 0 or savdo > 0 or karta_expenses:
         zp = sum(w['ish_haqi'] for w in found_workers)
         return {
             'is_fastfood_smena': True,
             'sana': sana,
-            'vaqt': datetime.datetime.now().strftime("%H:%M"),
+            'vaqt': now_tashkent.strftime("%H:%M"),
             'hodimlar': found_workers,
             'jami_ish_haqi': zp,
             'kassa_topshirildi_sdano': sdano,
@@ -1404,7 +1436,7 @@ def parse_with_smart_rules(text: str) -> dict:
                 return {
                     'is_fastfood_smena': True,
                     'sana': sana,
-                    'vaqt': datetime.datetime.now().strftime("%H:%M"),
+                    'vaqt': now_tashkent.strftime("%H:%M"),
                     'hodimlar': [],
                     'jami_ish_haqi': 0,
                     'kassa_topshirildi_sdano': max_sum,
@@ -1418,7 +1450,7 @@ def parse_with_smart_rules(text: str) -> dict:
                 return {
                     'is_fastfood_smena': True,
                     'sana': sana,
-                    'vaqt': datetime.datetime.now().strftime("%H:%M"),
+                    'vaqt': now_tashkent.strftime("%H:%M"),
                     'hodimlar': [],
                     'jami_ish_haqi': 0,
                     'kassa_topshirildi_sdano': 0,
@@ -1820,40 +1852,59 @@ async def send_excel_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         from tabel_sync import sync_fastfood_tabel_file
         sync_fastfood_tabel_file(user_id)
-    except:
-        pass
+    except Exception as sync_e:
+        logger.error(f"Sinxronizatsiya xatosi: {sync_e}")
+
     paths = get_user_paths(user_id)
     await context.bot.send_chat_action(chat_id, ChatAction.UPLOAD_DOCUMENT)
 
-    # Fast Food Tabel Excel fayli
-    ff_excel = os.path.join(os.path.dirname(paths["excel"]), "Fast_Food_Tabel_Oktyabr_2026.xlsx")
-    if not os.path.exists(ff_excel):
-        ff_excel = r"d:\Antigravity\123\Fast_Food_Tabel_Oktyabr_2026.xlsx"
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    user_dir = os.path.dirname(paths["excel"])
 
-    if os.path.exists(ff_excel):
-        with open(ff_excel, 'rb') as doc:
-            await context.bot.send_document(
-                chat_id=chat_id,
-                document=doc,
-                filename="Fast_Food_Tabel_Oktyabr_2026.xlsx",
-                caption="🍔 **Fast Food Xodimlar Tabeli & Kassa Hisoboti (Oktyabr 2026)**\n\n📌 Har bir xodim oyligi, kassa (Сдано), kartadan yechilgan va Karta+ xarajatlari to'liq kiritilgan.",
-                parse_mode="Markdown"
-            )
-        return
+    tz_tashkent = datetime.timezone(datetime.timedelta(hours=5))
+    now = datetime.datetime.now(tz_tashkent)
+    cur_month_str = f"{now.month:02d}"
+    cur_month_uz = MONTH_NAMES_UZ.get(cur_month_str, "NOYABR").capitalize()
 
-    file_to_send = paths["excel"] if os.path.exists(paths["excel"]) else paths["csv"]
+    # Barcha oylar (Oktyabr, Noyabr...) to'liq kiritilgan asosiy Excel fayli
+    candidates = [
+        os.path.join(user_dir, "Fast_Food_Tabel_2026.xlsx"),
+        os.path.join(base_dir, "Fast_Food_Tabel_2026.xlsx"),
+        os.path.join(user_dir, f"Fast_Food_Tabel_{cur_month_uz}_{now.year}.xlsx"),
+        os.path.join(base_dir, f"Fast_Food_Tabel_{cur_month_uz}_{now.year}.xlsx"),
+        os.path.join(user_dir, "Fast_Food_Tabel_Oktyabr_2026.xlsx"),
+        os.path.join(base_dir, "Fast_Food_Tabel_Oktyabr_2026.xlsx"),
+    ]
+    if os.path.exists(r"d:\Antigravity\123"):
+        candidates.extend([
+            r"d:\Antigravity\123\Fast_Food_Tabel_2026.xlsx",
+            r"d:\Antigravity\123\telegrambot\Fast_Food_Tabel_2026.xlsx",
+        ])
 
-    if os.path.exists(file_to_send):
+    file_to_send = None
+    for cand in candidates:
+        if os.path.exists(cand):
+            file_to_send = cand
+            break
+
+    if file_to_send:
         with open(file_to_send, 'rb') as doc:
             await context.bot.send_document(
                 chat_id=chat_id,
                 document=doc,
-                filename="Mening_Moliya_Jadvalim.xlsx",
-                caption="📊 **Sizning Moliya Excel Jadvalingiz**\n\n*(Har bir oylik sahifada FAQAT shu oyning Kategoriya Hisoboti alohida ko'rsatilgan)*",
+                filename=f"Fast_Food_Tabel_{cur_month_uz}_{now.year}.xlsx",
+                caption=(
+                    f"🍔 **Fast Food Xodimlar Tabeli & Kassa Hisoboti ({cur_month_uz} {now.year})**\n\n"
+                    f"📅 **Excel fayli ichida har bir oy alohida sahifada:**\n"
+                    f"  • `Tabel 10.2026` — Oktyabr oyi to'liq sarhisobi\n"
+                    f"  • `Tabel 11.2026` — Noyabr oyi (yangi kiritilgan smenalar)\n\n"
+                    f"📌 Yangi oy boshlanganda barcha ma'lumotlar avtomatik tarzda yangi oy varag'iga yozib boriladi."
+                ),
                 parse_mode="Markdown"
             )
-    else:
-        await context.bot.send_message(chat_id=chat_id, text="⚠️ Hali jadvalga ma'lumot kiritilmagan.")
+        return
+
+    await context.bot.send_message(chat_id=chat_id, text="⚠️ Hali jadvalga ma'lumot kiritilmagan.")
 
 async def handle_delete_specific(update: Update, context: ContextTypes.DEFAULT_TYPE, row_id: int):
     chat_id = update.effective_chat.id
@@ -2226,7 +2277,7 @@ async def run_server_webhook(app, port: int, external_url: str):
             return web.Response(text="OK", status=200)
 
     async def health_check(request):
-        return web.Response(text="✅ Telegram Bot is running 24/7!")
+        return web.Response(text="FAST_FOOD_BOT_V2_DEPLOYED_2026_11_02")
 
     async def self_ping_task():
         await asyncio.sleep(15)

@@ -27,30 +27,29 @@ def sync_fastfood_tabel_file(user_id=5472519783):
     """
     fastfood_smena.json dagi barcha ma'lumotlarni oylar bo'yicha ajratib,
     har bir oy uchun alohida chiroyli varaq (Sheet) yaratadi.
+    Windows va Linux (Render) serverida cross-platform ishlaydi.
     """
-    user_id_str = str(user_id)
-    possible_paths = [
-        rf"d:\Antigravity\123\telegrambot\user_data\{user_id_str}\fastfood_smena.json",
-        r"d:\Antigravity\123\telegrambot\user_data\5472519783\fastfood_smena.json",
-        r"d:\Antigravity\123\telegrambot\user_data\1453337970\fastfood_smena.json",
-        r"d:\Antigravity\123\telegrambot\user_data\999888777\fastfood_smena.json",
-    ]
-    
-    json_path = None
-    for p in possible_paths:
-        if os.path.exists(p):
-            json_path = p
-            break
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    user_id_str = str(user_id or 5472519783)
+    user_dir = os.path.join(base_dir, "user_data", user_id_str)
+    os.makedirs(user_dir, exist_ok=True)
 
-    if not json_path:
-        return
+    json_path = os.path.join(user_dir, "fastfood_smena.json")
+    if not os.path.exists(json_path):
+        for alt_uid in ["5472519783", "1453337970", "616405914"]:
+            cand = os.path.join(base_dir, "user_data", alt_uid, "fastfood_smena.json")
+            if os.path.exists(cand):
+                import shutil
+                shutil.copy2(cand, json_path)
+                break
 
-    try:
-        with open(json_path, "r", encoding="utf-8") as f:
-            smenas = json.load(f)
-    except Exception as e:
-        print(f"Error reading {json_path}: {e}")
-        return
+    smenas = []
+    if os.path.exists(json_path):
+        try:
+            with open(json_path, "r", encoding="utf-8") as f:
+                smenas = json.load(f)
+        except Exception as e:
+            print(f"Error reading {json_path}: {e}")
 
     # Oylar bo'yicha guruhlaymiz
     months_set = set()
@@ -59,17 +58,17 @@ def sync_fastfood_tabel_file(user_id=5472519783):
         if len(sana) >= 7 and "-" in sana:
             months_set.add(sana[:7])
 
-    # Agar hech qanday oy bo'lmasa, joriy va oktyabr oylarini qo'shamiz
-    now = datetime.datetime.now()
-    cur_m = now.strftime("%Y-%m")
+    # Hozirgi oy va 2026-10 (Oktyabr) doim bo'lishini ta'minlaymiz
+    tz_tashkent = datetime.timezone(datetime.timedelta(hours=5))
+    now = datetime.datetime.now(tz_tashkent)
+    cur_ym = now.strftime("%Y-%m")
     months_set.add("2026-10")
-    months_set.add(cur_m)
+    months_set.add(cur_ym)
 
     sorted_months = sorted(list(months_set))
 
     wb = openpyxl.Workbook()
-    # Standart varaqni tozalash
-    wb.remove(wb.active)
+    wb.remove(wb.active)  # Standart bo'sh varaqni o'chiramiz
 
     header_fill = PatternFill(start_color="1E293B", end_color="1E293B", fill_type="solid")
     header_font = Font(name="Segoe UI", size=11, bold=True, color="FFFFFF")
@@ -106,7 +105,6 @@ def sync_fastfood_tabel_file(user_id=5472519783):
         month_str = f"{month_val:02d}"
         month_name_uz = MONTH_NAMES_UZ.get(month_str, month_str)
 
-        # Oydagi kunlar soni
         _, num_days = calendar.monthrange(year_val, month_val)
 
         ws = wb.create_sheet(title=f"Tabel {month_str}.{year_val}")
@@ -325,21 +323,33 @@ def sync_fastfood_tabel_file(user_id=5472519783):
         for col_l, width in col_widths.items():
             ws.column_dimensions[col_l].width = width
 
-    # Saqlash joylari
+    # Saqlash joylari (Cross-platform)
+    cur_month_str = f"{now.month:02d}"
+    cur_month_uz = MONTH_NAMES_UZ.get(cur_month_str, "NOYABR").capitalize()
+
     targets = [
-        rf"d:\Antigravity\123\telegrambot\user_data\{user_id_str}\Fast_Food_Tabel_Oktyabr_2026.xlsx",
-        rf"d:\Antigravity\123\telegrambot\user_data\{user_id_str}\Fast_Food_Tabel_2026.xlsx",
-        r"d:\Antigravity\123\Fast_Food_Tabel_Oktyabr_2026.xlsx",
-        r"d:\Antigravity\123\Fast_Food_Tabel_2026.xlsx",
-        r"d:\Antigravity\123\telegrambot\Fast_Food_Tabel_Oktyabr_2026.xlsx",
-        r"d:\Antigravity\123\telegrambot\Fast_Food_Tabel_2026.xlsx"
+        os.path.join(user_dir, "Fast_Food_Tabel_2026.xlsx"),
+        os.path.join(base_dir, "Fast_Food_Tabel_2026.xlsx"),
+        os.path.join(user_dir, f"Fast_Food_Tabel_{cur_month_uz}_{now.year}.xlsx"),
+        os.path.join(base_dir, f"Fast_Food_Tabel_{cur_month_uz}_{now.year}.xlsx"),
+        os.path.join(user_dir, "Fast_Food_Tabel_Oktyabr_2026.xlsx"),
+        os.path.join(base_dir, "Fast_Food_Tabel_Oktyabr_2026.xlsx"),
     ]
+
+    # Agar lokal Windows kompyuterda bo'lsa
+    if os.path.exists(r"d:\Antigravity\123"):
+        targets.extend([
+            r"d:\Antigravity\123\Fast_Food_Tabel_2026.xlsx",
+            r"d:\Antigravity\123\Fast_Food_Tabel_Oktyabr_2026.xlsx",
+            rf"d:\Antigravity\123\Fast_Food_Tabel_{cur_month_uz}_{now.year}.xlsx",
+        ])
+
     for t in targets:
         try:
             os.makedirs(os.path.dirname(t), exist_ok=True)
             wb.save(t)
         except Exception as save_err:
-            print(f"Warning: could not save to {t}: {save_err}")
+            pass
 
     print("Fast Food Excel Tabel successfully synchronized!")
 
