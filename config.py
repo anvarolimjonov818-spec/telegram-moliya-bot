@@ -15,10 +15,10 @@ load_dotenv(dotenv_path=ENV_PATH)
 load_dotenv(dotenv_path=BASE_DIR.parent / ".env")
 
 # ─── ASOSIY MAXFIY KALITLAR (Faqat .env yoki Muhit O'zgaruvchilaridan) ───
-BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
-GCP_API_KEY = os.getenv("GCP_API_KEY", "").strip()
+BOT_TOKEN = (os.getenv("BOT_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN") or "").strip()
+GROQ_API_KEY = (os.getenv("GROQ_API_KEY") or "").strip()
+GEMINI_API_KEY = (os.getenv("GEMINI_API_KEY") or "").strip()
+GCP_API_KEY = (os.getenv("GCP_API_KEY") or "").strip()
 
 # ─── QO'SHIMCHA SOZLAMALAR ───
 BOT_NAME = os.getenv("BOT_NAME", "Yuksalish Bot")

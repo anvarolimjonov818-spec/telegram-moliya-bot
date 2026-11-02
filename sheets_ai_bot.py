@@ -2429,6 +2429,10 @@ async def run_server_webhook(app, port: int, external_url: str):
     await asyncio.Event().wait()
 
 def main():
+    if not BOT_TOKEN:
+        print('CRITICAL: BOT_TOKEN is missing! Set BOT_TOKEN in Render Environment variables.', flush=True)
+        import sys
+        sys.exit(1)
     logger.info("🤖 Voice & Text to Styled Excel (.xlsx) Bot with Robust Webhook Support (480.000 so'm)...")
     app = (
         Application.builder()
