@@ -399,18 +399,31 @@ def calculate_fastfood_summary(user_id=None, month_prefix=None, start_day=1, end
         "end_day": end_day
     }
 
-def format_fastfood_shift_message(data: dict) -> str:
+def format_fastfood_shift_message(data: dict, transcribed_text: str = None, newly_added: dict = None) -> str:
     sana = data.get("sana", datetime.datetime.now().strftime("%Y-%m-%d"))
     text = f"🍔 **FAST FOOD KUNLIK SMENA HISOBOTI** 📋\n"
     text += f"📅 **Sana:** `{sana}`\n"
     text += f"━━━━━━━━━━━━━━━━━━━━━━\n\n"
 
+    if transcribed_text:
+        text += f"🗣 **Eshitilgan xabar:** *\"{transcribed_text}\"*\n\n"
+
+    if newly_added and newly_added.get("hodimlar"):
+        text += "✨ **Yangi qo'shilgan / yangilangan:**\n"
+        for w in newly_added["hodimlar"]:
+            text += f"  ➕ **{w['ism']}:** `{int(w['ish_haqi']):,}` so'm\n"
+        if newly_added.get("sdano"):
+            text += f"  💵 **Kassa (Сдано):** `{int(newly_added['sdano']):,}` so'm\n"
+        if newly_added.get("kartadan"):
+            text += f"  💳 **Kartadan yechildi:** `{int(newly_added['kartadan']):,}` so'm\n"
+        text += "\n"
+
     workers = data.get("hodimlar", [])
     if workers:
-        text += "👥 **XODIMLAR ISH HAQI (З/П):**\n"
+        text += "👥 **KUNNING JAMI XODIMLAR RO'YXATI (З/П):**\n"
         for w in workers:
             ism = w.get("ism", "Xodim")
-            lavozim = f" ({w['lavozim']})" if w.get("lavozim") else ""
+            lavozim = f" ({w['lavozim']})" if w.get("lavozim") and w['lavozim'] != "bo'sh" else ""
             soat = f" [{w['soat']} soat]" if w.get("soat") else ""
             haq = int(w.get("ish_haqi", 0))
             text += f"  • {ism}{lavozim}{soat}: `{haq:,}` so'm\n"
@@ -1209,14 +1222,42 @@ def save_key_to_env(key_name: str, key_val: str):
     with open(env_path, "w", encoding="utf-8") as f:
         f.writelines(lines)
 
-async def transcribe_audio_with_groq(audio_bytes: bytes, language: str = "ru") -> str:
-    """
-    Groq Whisper API (whisper-large-v3) orqali ovozli xabarni matnga o'girish.
-    Faqat xotirada (RAM in-memory bytes) ishlaydi va diskka yuk tushirmaydi.
-    Majburiy language="ru" parametri bilan rus tilidagi audio aniq tanib olinadi.
-    """
+def normalize_spoken_numbers(text: str) -> str:
+    if not text:
+        return text
+    t = text.lower()
+    replacements = [
+        (r"(\d+)\s*(?:yarim|ярим)\s*(?:ming|минг)?", lambda m: str(int(m.group(1)) * 1000 + 500)),
+        (r"(\d+)\s*(?:с половиной|и половина)\s*(?:тысяч|тысячи|тыс)?", lambda m: str(int(m.group(1)) * 1000 + 500)),
+        (r"\bsakkiz\s*(?:ming\s*)?besh\s*yuz\b|\bсаккиз\s*(?:минг\s*)?беш\s*юз\b|\bвосемь\s*(?:тысяч\s*)?пятьсот\b", "8500"),
+        (r"\bsakkiz\s*yarim\s*ming\b|\bсаккиз\s*ярим\s*минг\b|\bвосемь\s*с\s*половиной\s*(?:тысяч)?\b", "8500"),
+        (r"\bsakkiz\s*yarim\b|\bсаккиз\s*ярим\b|\bвосемь\s*с\s*половиной\b", "8500"),
+        (r"\bsakson\s*besh\s*yuz\b|\bсаксон\s*беш\s*юз\b", "8500"),
+        (r"\bto['g]?rt\s*(?:ming\s*)?besh\s*yuz\b|\bтўрт\s*(?:минг\s*)?беш\s*юз\b|\bчетыре\s*(?:тысяч\s*)?пятьсот\b", "4500"),
+        (r"\bto['g]?rt\s*yarim\s*ming\b|\bтўрт\s*ярим\s*минг\b|\bчетыре\s*с\s*половиной\s*(?:тысяч)?\b", "4500"),
+        (r"\bto['g]?rt\s*yarim\b|\bтўрт\s*ярим\b|\bчетыре\s*с\s*половиной\b", "4500"),
+        (r"\bqirq\s*besh\s*yuz\b|\bқирқ\s*беш\s*юз\b", "4500"),
+        (r"\bbesh\s*ming\b|\bбеш\s*минг\b|\bпять\s*тысяч\b", "5000"),
+        (r"\betti\s*ming\b|\bетти\s*минг\b|\bсемь\s*тысяч\b", "7000"),
+        (r"\bsakkiz\s*ming\b|\bсаккиз\s*минг\b|\bвосемь\s*тысяч\b", "8000"),
+        (r"\bto['g]?qqiz\s*ming\b|\bтўққиз\s*минг\b|\bдевять\s*тысяч\b", "9000"),
+        (r"\bo['g]?n\s*ming\b|\bўн\s*минг\b|\bдесять\s*тысяч\b", "10000"),
+        (r"\bo['g]?n\s*besh\s*ming\b|\bўн\s*беш\s*минг\b|\bпятнадцать\s*тысяч\b", "15000"),
+        (r"\bo['g]?n\s*yetti\s*ming\b|\bўн\s*етти\s*минг\b|\bсемнадцать\s*тысяч\b", "17000"),
+        (r"\byigirma\s*ming\b|\bйигирма\s*минг\b|\bдвадцать\s*тысяч\b", "20000"),
+        (r"\byigirma\s*besh\s*ming\b|\bйигирма\s*беш\s*минг\b|\bдвадцать\s*пять\s*тысяч\b", "25000"),
+        (r"\bo['g]?ttiz\s*ming\b|\bўттиз\s*минг\b|\bтридцать\s*тысяч\b", "30000"),
+    ]
+    for pattern, repl in replacements:
+        if callable(repl):
+            t = re.sub(pattern, repl, t)
+        else:
+            t = re.sub(pattern, repl, t)
+    return t
+
+async def transcribe_audio_with_groq(audio_bytes: bytes, language: str = None) -> str:
     if not GROQ_API_KEY:
-        raise ValueError("GROQ_API_KEY topilmadi. Iltimos, .env faylida GROQ_API_KEY ni ko'rsating.")
+        raise ValueError("GROQ_API_KEY topilmadi.")
 
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
@@ -1226,13 +1267,15 @@ async def transcribe_audio_with_groq(audio_bytes: bytes, language: str = "ru") -
     form = aiohttp.FormData()
     form.add_field('file', audio_bytes, filename='voice.ogg', content_type='audio/ogg')
     form.add_field('model', 'whisper-large-v3')
-    form.add_field('language', language)
+    if language:
+        form.add_field('language', language)
     form.add_field('temperature', '0.0')
     form.add_field('response_format', 'json')
     form.add_field('prompt', (
-        "Финансовые расчеты, смена, касса, зарплата, сдал, сдано, снял с карты, карта плюс, "
-        "выручка, расход, приход. Нурбек, Журабек, Махмуд, Нодира, Робия, Рохат, "
-        "сантехник, малиш, шина 983, бензин, аренда, продукты, тысяч сум."
+        "Нурбек 8500, Журабек 8500, Махмуд 5000, Нодира 4500, Робия 4500, Рохат 4500, "
+        "Сдано 10000, Снял с карты 17000, Сантехник 10000, Малиш 5000, Шина 983 25000. "
+        "Nurbek 8500, Jorabek 8500, Mahmud 5000, Nodira 4500, Robiya 4500, Rohat 4500, "
+        "Sdano 10000, Kassa 10000, Kartadan 17000."
     ))
 
     async with aiohttp.ClientSession() as session:
@@ -1248,16 +1291,12 @@ async def transcribe_audio_with_groq(audio_bytes: bytes, language: str = "ru") -
                     raw_text = result.get("text", "").strip()
                     cleaned_text = clean_stt_noise(raw_text)
                     return cleaned_text
-
-                err_text = await resp.text()
-                if resp.status == 401:
-                    raise PermissionError(f"Groq API kaliti yaroqsiz (401 Unauthorized): {err_text[:100]}")
-                elif resp.status == 429:
-                    raise ConnectionResetError(f"Groq so'rovlar limiti tugadi (429 Rate Limit): {err_text[:100]}")
                 else:
-                    raise RuntimeError(f"Whisper error ({resp.status}): {err_text[:150]}")
-        except asyncio.TimeoutError:
-            raise TimeoutError("Groq Whisper API bilan ulanish vaqti tugadi (Timeout).")
+                    err_body = await resp.text()
+                    raise Exception(f"Groq Whisper xatosi ({resp.status}): {err_body[:150]}")
+        except Exception as e:
+            logger.error(f"Whisper request error: {e}")
+            raise e
 
 async def call_gemini_parser(prompt_text: str, audio_b64: str = None) -> str:
     parts = [{"text": prompt_text}]
@@ -2175,7 +2214,13 @@ async def handle_text_or_voice(update: Update, context: ContextTypes.DEFAULT_TYP
                 await msg.reply_text(f"❌ Ovozni tanishda xatolik yuz berdi: {w_err}\nIltimos, qayta yuboring yoki matn sifatida yozing.")
                 return
 
-        res = await parse_note_with_ai(text=text_input, audio_b64=audio_b64)
+                original_voice_text = text_input
+        norm_text = normalize_spoken_numbers(text_input)
+
+        res = await parse_note_with_ai(text=norm_text, audio_b64=audio_b64)
+        if not res:
+            res = parse_with_smart_rules(norm_text)
+
         if not res:
             res = {
                 "is_fastfood_smena": True,
@@ -2192,6 +2237,30 @@ async def handle_text_or_voice(update: Update, context: ContextTypes.DEFAULT_TYP
             }
         else:
             res["is_fastfood_smena"] = True
+
+        newly_added_info = {
+            "hodimlar": res.get("hodimlar", []),
+            "sdano": res.get("kassa_topshirildi_sdano", 0),
+            "kartadan": res.get("kartadan_yechildi", 0),
+            "karta_items": res.get("karta_avans_va_xarajatlar", [])
+        }
+        has_new_content = bool(
+            newly_added_info["hodimlar"] or
+            newly_added_info["sdano"] or
+            newly_added_info["kartadan"] or
+            newly_added_info["karta_items"]
+        )
+
+        if not has_new_content:
+            await wait_msg.delete()
+            no_match_text = (
+                f"🗣 **Eshitilgan xabar:** *\"{original_voice_text}\"*\n\n"
+                "⚠️ Ushbu xabardan xodim ismi yoki to'lov summasi aniqlanmadi.\n\n"
+                "👉 *Iltimos, xodim ismi va summasini aniq ayting:*\n"
+                "Masalan: *\"Журабек 8500\"*, *\"Махмуд 5000\"*, *\"Сдано 10000\"*, *\"Снял с карты 17000\"*"
+            )
+            await msg.reply_text(no_match_text, parse_mode="Markdown")
+            return
 
         # Smenani mavjud smenalar bilan aqlli birlashtiramiz (Merge)
         smenas = load_fastfood_smenas(user_id=user_id)
@@ -2239,7 +2308,11 @@ async def handle_text_or_voice(update: Update, context: ContextTypes.DEFAULT_TYP
 
         await wait_msg.delete()
 
-        reply_text = format_fastfood_shift_message(res)
+        reply_text = format_fastfood_shift_message(
+            res,
+            transcribed_text=original_voice_text,
+            newly_added=newly_added_info
+        )
         await msg.reply_text(
             reply_text,
             parse_mode="Markdown",
