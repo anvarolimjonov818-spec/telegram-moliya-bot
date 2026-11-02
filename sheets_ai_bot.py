@@ -1937,7 +1937,7 @@ async def send_excel_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"📅 **Excel fayli ichida har bir oy alohida sahifada:**\n"
                     f"  • `Tabel 10.2026` — Oktyabr oyi to'liq sarhisobi\n"
                     f"  • `Tabel 11.2026` — Noyabr oyi (yangi kiritilgan smenalar)\n\n"
-                    f"📌 Yangi oy boshlanganda barcha ma'lumotlar avtomatik tarzda yangi oy varag'iga yozib boriladi."
+                    f"✨ **Fayl ochilganda avtomatik tarzda joriy oy ({cur_month_uz} {now.year}) varag'i ochiladi!**"
                 ),
                 parse_mode="Markdown"
             )

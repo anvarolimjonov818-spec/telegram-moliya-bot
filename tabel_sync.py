@@ -323,6 +323,13 @@ def sync_fastfood_tabel_file(user_id=5472519783):
         for col_l, width in col_widths.items():
             ws.column_dimensions[col_l].width = width
 
+    # Hozirgi oy varag'ini faol (Active) qilib belgilaymiz, shunda fayl ochilganda aynan hozirgi oy avtomatik ochiladi
+    cur_sheet_title = f"Tabel {now.month:02d}.{now.year}"
+    target_ws = wb[cur_sheet_title] if cur_sheet_title in wb.sheetnames else wb.worksheets[-1]
+    wb.active = target_ws
+    for s in wb.worksheets:
+        s.sheet_view.tabSelected = (s == target_ws)
+
     # Saqlash joylari (Cross-platform)
     cur_month_str = f"{now.month:02d}"
     cur_month_uz = MONTH_NAMES_UZ.get(cur_month_str, "NOYABR").capitalize()
