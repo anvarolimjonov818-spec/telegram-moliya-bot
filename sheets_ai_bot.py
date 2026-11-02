@@ -2105,6 +2105,7 @@ async def handle_text_or_voice(update: Update, context: ContextTypes.DEFAULT_TYP
     user_id = msg.chat.id
     add_subscriber(user_id)
     text_input = msg.text or ""
+    original_voice_text = text_input
 
     # Groq API kalitini chatdan to'g'ridan-to'g'ri o'rnatish
     clean_text = text_input.strip()
@@ -2214,7 +2215,7 @@ async def handle_text_or_voice(update: Update, context: ContextTypes.DEFAULT_TYP
                 await msg.reply_text(f"❌ Ovozni tanishda xatolik yuz berdi: {w_err}\nIltimos, qayta yuboring yoki matn sifatida yozing.")
                 return
 
-                original_voice_text = text_input
+        original_voice_text = text_input
         norm_text = normalize_spoken_numbers(text_input)
 
         res = await parse_note_with_ai(text=norm_text, audio_b64=audio_b64)
