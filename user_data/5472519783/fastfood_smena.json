@@ -1032,5 +1032,25 @@
     "izoh": "30‑oktabr kuni smenada Nurbik 8 100 soʻm, Nodera 500 soʻm, Jorabik 500 soʻm va Rabia 6 000 soʻm olgan. Rahat ismi keltirilgan, lekin maosh ko‘rsatilmagan.",
     "toza_matn": "30‑oktabr, Nurbik 8 100, Nodera 500, Rahat, Jorabik 500, Rabia 6 000.",
     "vaqt": "17:10"
+  },
+  {
+    "is_fastfood_smena": true,
+    "sana": "2026-11-02",
+    "vaqt": "16:00",
+    "hodimlar": [
+      {
+        "ism": "Нурбек",
+        "ish_haqi": 8300,
+        "lavozim": "bo'sh",
+        "soat": null
+      }
+    ],
+    "jami_ish_haqi": 8300,
+    "kassa_topshirildi_sdano": 0,
+    "kartadan_yechildi": 0,
+    "savdo_viruchka": 0,
+    "karta_avans_va_xarajatlar": [],
+    "izoh": "Nurbekga 8300 so'm aylik hisoblandi.",
+    "toza_matn": "Nurbekga 8300 so'm aylik hisoblandi."
   }
 ]
