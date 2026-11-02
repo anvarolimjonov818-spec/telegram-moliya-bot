@@ -1390,7 +1390,7 @@ def parse_with_smart_rules(text: str) -> dict:
     # 2. Xodimlar ro'yxati (o'zbekcha va ruscha qo'shimchalar bilan: -ga, -ka, -ning, -ни...)
     suffixes = r'(?:ga|ka|ge|ke|ning|ni|га|ка|нинг|ни|а|у)?'
     workers_list = [
-        ("Нурбек", ["нурбек", "нурбик", "nurbek", "nurbik", "nurevika", "nurev", "nurbeg"]),
+        ("Нурбек", ["нурбек", "нурбик", "nurbek", "nurbik", "nurevika", "nurev", "nurbeg", "nurebek", "нуребек", "nurik", "нурик"]),
         ("Журабек", ["журабек", "jorabek", "jo'rabek", "jurabek", "corabek", "corab", "jora", "jo'ra", "жура"]),
         ("Мухмуд", ["мухмуд", "махмуд", "mahmud", "muhmad", "muhammadjon", "maxmud", "маxмуд"]),
         ("Нодира", ["нодира", "nodira", "nodera", "нодера"]),
@@ -2218,9 +2218,15 @@ async def handle_text_or_voice(update: Update, context: ContextTypes.DEFAULT_TYP
         original_voice_text = text_input
         norm_text = normalize_spoken_numbers(text_input)
 
-        res = await parse_note_with_ai(text=norm_text, audio_b64=audio_b64)
-        if not res:
-            res = parse_with_smart_rules(norm_text)
+        # 1. Avval Fast Food Smart Rules orqali aniqlaymiz (tezkor va 100% aniq)
+        res = parse_with_smart_rules(norm_text)
+        if not res or not (res.get("hodimlar") or res.get("kassa_topshirildi_sdano") or res.get("kartadan_yechildi") or res.get("karta_avans_va_xarajatlar")):
+            try:
+                ai_res = await parse_note_with_ai(text=norm_text, audio_b64=audio_b64)
+                if ai_res and (ai_res.get("hodimlar") or ai_res.get("kassa_topshirildi_sdano") or ai_res.get("kartadan_yechildi") or ai_res.get("karta_avans_va_xarajatlar")):
+                    res = ai_res
+            except Exception as ai_err:
+                logger.debug(f"AI parse fallback error: {ai_err}")
 
         if not res:
             res = {
@@ -2241,14 +2247,14 @@ async def handle_text_or_voice(update: Update, context: ContextTypes.DEFAULT_TYP
 
         newly_added_info = {
             "hodimlar": res.get("hodimlar", []),
-            "sdano": res.get("kassa_topshirildi_sdano", 0),
-            "kartadan": res.get("kartadan_yechildi", 0),
+            "sdano": int(res.get("kassa_topshirildi_sdano") or 0),
+            "kartadan": int(res.get("kartadan_yechildi") or 0),
             "karta_items": res.get("karta_avans_va_xarajatlar", [])
         }
         has_new_content = bool(
             newly_added_info["hodimlar"] or
-            newly_added_info["sdano"] or
-            newly_added_info["kartadan"] or
+            newly_added_info["sdano"] > 0 or
+            newly_added_info["kartadan"] > 0 or
             newly_added_info["karta_items"]
         )
 
@@ -2281,14 +2287,19 @@ async def handle_text_or_voice(update: Update, context: ContextTypes.DEFAULT_TYP
             for w in res.get("hodimlar", []):
                 w_dict[w["ism"]] = w
             existing["hodimlar"] = list(w_dict.values())
-            existing["jami_ish_haqi"] = sum(w.get("ish_haqi", 0) for w in existing["hodimlar"])
+            existing["jami_ish_haqi"] = sum(int(w.get("ish_haqi") or 0) for w in existing["hodimlar"])
 
-            if res.get("kassa_topshirildi_sdano", 0) > 0:
-                existing["kassa_topshirildi_sdano"] = res["kassa_topshirildi_sdano"]
-            if res.get("kartadan_yechildi", 0) > 0:
-                existing["kartadan_yechildi"] = res["kartadan_yechildi"]
-            if res.get("savdo_viruchka", 0) > 0:
-                existing["savdo_viruchka"] = res["savdo_viruchka"]
+            sd_val = int(res.get("kassa_topshirildi_sdano") or 0)
+            if sd_val > 0:
+                existing["kassa_topshirildi_sdano"] = sd_val
+
+            sn_val = int(res.get("kartadan_yechildi") or 0)
+            if sn_val > 0:
+                existing["kartadan_yechildi"] = sn_val
+
+            sv_val = int(res.get("savdo_viruchka") or 0)
+            if sv_val > 0:
+                existing["savdo_viruchka"] = sv_val
 
             k_list = existing.get("karta_avans_va_xarajatlar", [])
             for k in res.get("karta_avans_va_xarajatlar", []):
