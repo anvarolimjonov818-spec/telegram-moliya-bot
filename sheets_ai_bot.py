@@ -577,12 +577,15 @@ MONTH_NAMES_UZ = {
 }
 
 def clean_stt_noise(text: str) -> str:
-    """Whisper tushunarsiz shovqin so'zlarini matndan tozalash"""
+    """Whisper tushunarsiz shovqin so'zlarini matndan tozalash (o'zbek va rus tillari uchun)"""
     if not text:
-        return text
+        return ""
     noise_patterns = [
         r'\bget\b', r'\bover\b', r'\bzikim\b', r'\buh\b', r'\bumm\b',
-        r'\bsubtitles\b', r'\bby amara\.org\b', r'\bthank you\b', r'\bthanks\b'
+        r'\bsubtitles\b', r'\bby amara\.org\b', r'\bthank you\b', r'\bthanks\b',
+        r'\[.*?\]', r'\(.*?\)',
+        r'субтитры.*', r'редактор.*', r'перевод.*', r'продолжение следует.*',
+        r'спасибо за просмотр.*', r'подписывайтесь на канал.*'
     ]
     cleaned = text
     for np in noise_patterns:
@@ -1188,23 +1191,73 @@ Javobingiz FAQAT toza JSON bo'lishi shart:
 - "Nasiya berildi" bo'lsa -> nasiya_som ga summani yozing, tushum va xarajat 0 bo'lsin.
 - "Nasiya qaytdi" bo'lsa -> nasiya_som ga summani yozing, tushum va xarajat 0 bo'lsin."""
 
-async def transcribe_audio_with_groq(audio_bytes: bytes) -> str:
-    headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
+def save_key_to_env(key_name: str, key_val: str):
+    """Yangi API kalitni .env fayliga xavfsiz saqlash"""
+    env_path = os.path.join(os.path.dirname(__file__), ".env")
+    lines = []
+    found = False
+    if os.path.exists(env_path):
+        with open(env_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+        for idx, line in enumerate(lines):
+            if line.strip().startswith(f"{key_name}=") or line.strip().startswith(f"{key_name} ="):
+                lines[idx] = f"{key_name}={key_val}\n"
+                found = True
+                break
+    if not found:
+        lines.append(f"{key_name}={key_val}\n")
+    with open(env_path, "w", encoding="utf-8") as f:
+        f.writelines(lines)
+
+async def transcribe_audio_with_groq(audio_bytes: bytes, language: str = "ru") -> str:
+    """
+    Groq Whisper API (whisper-large-v3) orqali ovozli xabarni matnga o'girish.
+    Faqat xotirada (RAM in-memory bytes) ishlaydi va diskka yuk tushirmaydi.
+    Majburiy language="ru" parametri bilan rus tilidagi audio aniq tanib olinadi.
+    """
+    if not GROQ_API_KEY:
+        raise ValueError("GROQ_API_KEY topilmadi. Iltimos, .env faylida GROQ_API_KEY ni ko'rsating.")
+
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+    }
+
     form = aiohttp.FormData()
     form.add_field('file', audio_bytes, filename='voice.ogg', content_type='audio/ogg')
-    form.add_field('model', 'whisper-large-v3-turbo')
-    form.add_field('language', 'uz')
+    form.add_field('model', 'whisper-large-v3')
+    form.add_field('language', language)
     form.add_field('temperature', '0.0')
-    form.add_field('prompt', "O'zbek tilidagi moliya, tushum va xarajatlar: to'rt yuz sakson ming so'm to'lov qildim, 480 ming so'm, uch yuz ellik ming, sakson ming so'm, benzinga yigirma besh ming, tushlikka 45 ming, Alisherdan 500 ming tushum oldim, nasiya qarz 1 million so'm.")
+    form.add_field('response_format', 'json')
+    form.add_field('prompt', (
+        "Финансовые расчеты, смена, касса, зарплата, сдал, сдано, снял с карты, карта плюс, "
+        "выручка, расход, приход. Нурбек, Журабек, Махмуд, Нодира, Робия, Рохат, "
+        "сантехник, малиш, шина 983, бензин, аренда, продукты, тысяч сум."
+    ))
 
     async with aiohttp.ClientSession() as session:
-        async with session.post(GROQ_WHISPER_URL, data=form, headers=headers, timeout=aiohttp.ClientTimeout(total=45)) as resp:
-            if resp.status != 200:
+        try:
+            async with session.post(
+                GROQ_WHISPER_URL,
+                data=form,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=45)
+            ) as resp:
+                if resp.status == 200:
+                    result = await resp.json()
+                    raw_text = result.get("text", "").strip()
+                    cleaned_text = clean_stt_noise(raw_text)
+                    return cleaned_text
+
                 err_text = await resp.text()
-                raise Exception(f"Whisper error ({resp.status}): {err_text[:150]}")
-            result = await resp.json()
-            text = result.get("text", "").strip()
-            return fix_uzbek_speech_phonetics(text)
+                if resp.status == 401:
+                    raise PermissionError(f"Groq API kaliti yaroqsiz (401 Unauthorized): {err_text[:100]}")
+                elif resp.status == 429:
+                    raise ConnectionResetError(f"Groq so'rovlar limiti tugadi (429 Rate Limit): {err_text[:100]}")
+                else:
+                    raise RuntimeError(f"Whisper error ({resp.status}): {err_text[:150]}")
+        except asyncio.TimeoutError:
+            raise TimeoutError("Groq Whisper API bilan ulanish vaqti tugadi (Timeout).")
 
 async def call_gemini_parser(prompt_text: str, audio_b64: str = None) -> str:
     parts = [{"text": prompt_text}]
@@ -2056,13 +2109,7 @@ async def handle_text_or_voice(update: Update, context: ContextTypes.DEFAULT_TYP
                 async with aiohttp.ClientSession() as session:
                     async with session.get("https://api.groq.com/openai/v1/models", headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                         if resp.status == 200:
-                            cfg_path = os.path.join(os.path.dirname(__file__), "config.py")
-                            if os.path.exists(cfg_path):
-                                with open(cfg_path, "r", encoding="utf-8") as f:
-                                    c_text = f.read()
-                                c_text = re.sub(r"GROQ_API_KEY\s*=\s*\"[^\"]*\"", f"GROQ_API_KEY = \"{new_groq_key}\"", c_text)
-                                with open(cfg_path, "w", encoding="utf-8") as f:
-                                    f.write(c_text)
+                            save_key_to_env("GROQ_API_KEY", new_groq_key)
                             global GROQ_API_KEY
                             GROQ_API_KEY = new_groq_key
                             os.environ["GROQ_API_KEY"] = new_groq_key
@@ -2109,39 +2156,61 @@ async def handle_text_or_voice(update: Update, context: ContextTypes.DEFAULT_TYP
 
     try:
         if msg.voice or msg.audio:
+            media = msg.voice or msg.audio
+            if media.file_size and media.file_size > 25 * 1024 * 1024:
+                await wait_msg.delete()
+                await msg.reply_text("❌ Ovozli xabar hajmi juda katta (maksimal 25 MB).")
+                return
+
             audio_bytes = None
             for attempt in range(3):
                 try:
-                    file_obj = await (msg.voice or msg.audio).get_file(read_timeout=60, write_timeout=60, connect_timeout=60)
-                    audio_bytes = await file_obj.download_as_bytearray(read_timeout=60, write_timeout=60, connect_timeout=60)
-                    audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
+                    file_obj = await media.get_file(read_timeout=60, write_timeout=60, connect_timeout=60)
+                    byte_arr = await file_obj.download_as_bytearray(read_timeout=60, write_timeout=60, connect_timeout=60)
+                    audio_bytes = bytes(byte_arr)
+                    audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
                     break
                 except Exception as dl_err:
-                    logger.warning(f"Audio download attempt {attempt+1} failed: {dl_err}")
+                    logger.warning(f"Audio yuklab olish xatosi ({attempt+1}-urinish): {dl_err}")
                     if attempt == 2:
-                        raise dl_err
+                        await wait_msg.delete()
+                        await msg.reply_text("❌ Ovozli xabarni Telegram serveridan yuklab bo'lmadi. Qaytadan yuboring.")
+                        return
                     await asyncio.sleep(1)
 
+            if not audio_bytes:
+                await wait_msg.delete()
+                await msg.reply_text("❌ Ovozli xabar bo'sh yoki yuklanmadi.")
+                return
+
             try:
-                logger.info("🎙 Groq Whisper API ga ovozli fayl yuborilmoqda...")
-                transcribed_text = await transcribe_audio_with_groq(bytes(audio_bytes))
+                logger.info("🎤 Groq Whisper API (whisper-large-v3, language='ru') ga ovoz yuborilmoqda...")
+                transcribed_text = await transcribe_audio_with_groq(audio_bytes, language="ru")
                 logger.info(f"✅ Ovoz matnga o'girildi: '{transcribed_text}'")
-                text_input = transcribed_text
-            except Exception as w_err:
-                logger.warning(f"Whisper xatosi: {w_err}")
-                if "401" in str(w_err) or "Invalid API Key" in str(w_err) or "invalid_api_key" in str(w_err):
+
+                if not transcribed_text:
                     await wait_msg.delete()
-                    guide_msg = (
-                        "⚠️ **Ovozli xabarni (golosovoy) eshitish uchun bepul Groq AI kaliti kerak!**\n\n"
-                        "🔑 **Kalitni olish juda oson (1 daqiqa):**\n"
-                        "1️⃣ [console.groq.com/keys](https://console.groq.com/keys) saytiga kiring (Google orqali kiring)\n"
-                        "2️⃣ **\"Create API Key\"** tugmasini bosing\n"
-                        "3️⃣ Chiqqan kalitni (`gsk_...`) nusxalab, **to'g'ridan-to'g'ri shu chatga yuboring**!\n\n"
-                        "💡 *Siz chatga tashlashingiz bilan men uni o'zim avtomatik o'rnatib olaman va ovozingizni eshitadigan bo'laman.*"
-                    )
-                    await msg.reply_text(guide_msg, parse_mode="Markdown", disable_web_page_preview=True)
+                    await msg.reply_text("⚠️ Ovozli xabardan so'zlarni ajratib bo'lmadi. Iltimos, aniqroq gapirib qayta yuboring.")
                     return
-                text_input = msg.caption or "Ovozli xabarni tahlil qil"
+
+                text_input = transcribed_text
+            except PermissionError as p_err:
+                logger.error(f"Whisper kalit xatosi: {p_err}")
+                await wait_msg.delete()
+                guide_msg = (
+                    "🔑 **Ovozli xabarni eshitish uchun Groq AI kaliti noto'g'ri yoki kiritilmagan!**\n\n"
+                    "1. [console.groq.com/keys](https://console.groq.com/keys) saytiga kiring\n"
+                    "2. **\"Create API Key\"** tugmasini bosing\n"
+                    "3. Chiqqan kalitni (`gsk_...`) nusxalab, **to'g'ridan-to'g'ri shu chatga yuboring**!\n\n"
+                    "*(Siz chatga yuborishingiz bilan bot uni .env fayliga avtomatik saqlab oladi)*"
+                )
+                await msg.reply_text(guide_msg, parse_mode="Markdown", disable_web_page_preview=True)
+                return
+            except Exception as w_err:
+                logger.error(f"Whisper xatosi: {w_err}")
+                await wait_msg.delete()
+                await msg.reply_text(f"❌ Ovozni tanishda xatolik yuz berdi: {w_err}\nIltimos, qayta yuboring yoki matn sifatida yozing.")
+                return
 
         res = await parse_note_with_ai(text=text_input, audio_b64=audio_b64)
 

@@ -1,7 +1,14 @@
+# Maxfiy muhit fayllari
+.env
+.env.local
+.env.*
+!.env.example
+
+# Python va loglar
 *.log
 __pycache__/
-.env
+*.pyc
 scratch/
 
+# Vercel va hosting keshlar
 .vercel
-.env*

@@ -1,14 +1,28 @@
 # ============================================================
-#  AI Telegram Bot — Konfiguratsiya (24/7 Cloud Support)
+#  AI Telegram Bot — Konfiguratsiya (.env orqali xavfsiz yuklash)
 # ============================================================
 import os
+from pathlib import Path
+from dotenv import load_dotenv
 
-def _d(arr, k=77):
-    return ''.join(chr(c ^ k) for c in arr)
+# Loyihaning asosiy papkasi (.env faylini joriy va yuqori papkadan qidiradi)
+BASE_DIR = Path(__file__).resolve().parent
+ENV_PATH = BASE_DIR / ".env"
 
-_T = [120, 117, 123, 126, 121, 122, 123, 121, 125, 116, 119, 12, 12, 8, 25, 57, 3, 18, 5, 56, 43, 9, 3, 21, 5, 55, 120, 7, 40, 7, 62, 28, 26, 42, 10, 47, 7, 125, 11, 10, 117, 8, 25, 43, 120, 34]
-_G = [42, 62, 38, 18, 116, 1, 62, 25, 117, 57, 56, 47, 7, 61, 116, 26, 12, 57, 40, 47, 37, 122, 53, 122, 26, 10, 41, 52, 47, 126, 11, 20, 25, 42, 47, 21, 26, 14, 21, 1, 33, 5, 3, 37, 25, 2, 4, 25, 61, 122, 7, 3, 1, 15, 121, 58]
+# .env faylini yuklaymiz (agar mavjud bo'lsa)
+load_dotenv(dotenv_path=ENV_PATH)
+# Yuqori papkadagi .env ham bo'lishi mumkin (fallback)
+load_dotenv(dotenv_path=BASE_DIR.parent / ".env")
 
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "").strip() or _d(_T)
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "").strip() or _d(_G)
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
+# ─── ASOSIY MAXFIY KALITLAR (Faqat .env yoki Muhit O'zgaruvchilaridan) ───
+BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+GCP_API_KEY = os.getenv("GCP_API_KEY", "").strip()
+
+# ─── QO'SHIMCHA SOZLAMALAR ───
+BOT_NAME = os.getenv("BOT_NAME", "Yuksalish Bot")
+MAX_HISTORY = int(os.getenv("MAX_HISTORY", "10"))
+IMAGE_WIDTH = int(os.getenv("IMAGE_WIDTH", "1024"))
+IMAGE_HEIGHT = int(os.getenv("IMAGE_HEIGHT", "1024"))
+DEFAULT_USER_ID = int(os.getenv("DEFAULT_USER_ID", "1453337970"))
