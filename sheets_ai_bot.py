@@ -2175,7 +2175,7 @@ async def handle_text_or_voice(update: Update, context: ContextTypes.DEFAULT_TYP
                 await msg.reply_text(f"❌ Ovozni tanishda xatolik yuz berdi: {w_err}\nIltimos, qayta yuboring yoki matn sifatida yozing.")
                 return
 
-                res = await parse_note_with_ai(text=text_input, audio_b64=audio_b64)
+        res = await parse_note_with_ai(text=text_input, audio_b64=audio_b64)
         if not res:
             res = {
                 "is_fastfood_smena": True,
